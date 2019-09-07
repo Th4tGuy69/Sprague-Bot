@@ -1,16 +1,23 @@
+import sys
+import json
 import discord
+from discord.ext import commands
 
-token = 'Mzg1MjIxNzkyMzcxMDQ4NDQ5.XXMsJg.mDfe-dRJccKRhKh7q4o4wwESht4'
+token = 'NjE5OTI3MzM5NzM1ODQyODI3.XXPraQ.ZlrOW7eFbTrbbi6Xh2aYuo9bkck'
+prefix = '!' #read token and prefix from json file
 
-client = discord.Client()
+
+client = commands.Bot(command_prefix=prefix)
 
 startsWith = '!'
 
 
 @client.event
 async def on_ready():
-    print('Logged in as: ' + client.user.name)
-    print('ID: ' + client.user.id)
+    print('Logged in as: ', client.user.name)
+    print('ID: ', client.user.id)
+    print('Using discord.py version: ', discord.__version__)
+    print('Running on python version: ', sys.version.split(' ')[0])
     print('Ready to use\n')
 
 
@@ -18,3 +25,5 @@ async def on_ready():
 async def on_message(message):
     if message.content.startswith(startsWith):
         print('hey')
+
+client.run(token)
