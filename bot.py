@@ -24,7 +24,7 @@ startsWith = '!'
 
 @client.event
 async def on_ready():
-    print('Logged in as: ', client.user.name)
+    print('\nLogged in as: ', client.user.name)
     print('ID: ', client.user.id)
     print('Using discord.py version: ', discord.__version__)
     print('Running on python version: ', sys.version.split(' ')[0])
