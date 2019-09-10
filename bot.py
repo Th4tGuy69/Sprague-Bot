@@ -12,11 +12,37 @@ import discord
 from discord.ext import commands
 
 
-with open('info.json') as json_file:
+class Cat:
+    catName = ''
+    subCats = []
+
+    def __init__(self, name, subs):
+        self.catName = name
+        self.subCats = subs
+
+cats = []
+
+with open('info.json', 'r') as json_file:
     data = json.load(json_file)
     for j in data['info']:
         token = j['token']
         prefix = j['prefix']
+    json_file.close()
+
+with open('classes.txt', 'r') as file:
+    #lineCount = file.readlines()
+    lineCount = 2
+    lines = []
+    for l in range(lineCount):
+        lines.append(file.readline())
+        if lines[l].endswith('I') or lines[l].endswith('V'):
+            pass
+        else:
+            cats.append(Cat(lines[l].replace('\n', ''), None))
+
+print('Cat 0 name: ', cats[0].catName, '. Cat 0 subs: ', cats[0].subCats)
+print('Cat 1 name: ', cats[1].catName, '. Cat 1 subs: ', cats[1].subCats)
+        
 
 
 client = commands.Bot(command_prefix=prefix)
@@ -52,6 +78,11 @@ async def on_message(message):
         return
     elif message.content.startswith(prefix):
         if 'create' in message.content: #Creates a 'class' (category w/ roles, permissions, vc, and text chat)
+
+
+
+
+
             for i in range(3):
                 global createdCategories
                 global createdRoles
