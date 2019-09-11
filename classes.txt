@@ -1,4 +1,4 @@
-20th Century II
+20th Century II 
 AP Art History
 AP Biology
 AP Calculus AB
@@ -56,8 +56,8 @@ Algebra Readiness
 Algebra Tutorial
 Anatomy & Physiology
 Athletic Train Practicum
-Athletic Training
-Athletic Training 2
+Athletic Training I
+Athletic Training II
 Auto Tech I
 Auto Tech II
 Basic Art Design

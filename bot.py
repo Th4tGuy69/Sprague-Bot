@@ -9,16 +9,16 @@
 import sys
 import json
 import discord
+import itertools
 from discord.ext import commands
 
 
 class Cat:
-    catName = ''
-    subCats = []
-
-    def __init__(self, name, subs):
+    def __init__(self, name, list subs):
         self.catName = name
-        self.subCats = subs
+        self.subCats = []
+        self.subCats += subs
+
 
 cats = []
 
@@ -30,19 +30,44 @@ with open('info.json', 'r') as json_file:
     json_file.close()
 
 with open('classes.txt', 'r') as file:
-    #lineCount = file.readlines()
-    lineCount = 2
+    lineCount = 25
     lines = []
     for l in range(lineCount):
         lines.append(file.readline())
-        if lines[l].endswith('I') or lines[l].endswith('V'):
+    for l in range(lineCount):
+        subs = []
+        category = ''
+        if lines[l].endswith(' I\n'):
+            category = lines[l].replace(' I\n', '')
+            subs.append(lines[l].replace('\n', ''))
+            try:
+                if category and ' II\n' in lines[l+1]:
+                    subs.append(lines[l+1].replace('\n', ''))
+                if category and ' III\n' in lines[l+2]:
+                    subs.append(lines[l+2].replace('\n', ''))
+                if category and ' IV\n' in lines[l+3]:
+                    subs.append(lines[l+3].replace('\n', ''))
+                
+                cats.append(Cat(category, subs))
+            except:
+                pass
+        elif lines[l].endswith(' II\n'):
+            pass
+        elif lines[l].endswith(' III\n'):
+            pass
+        elif lines[l].endswith(' IV\n'):
             pass
         else:
             cats.append(Cat(lines[l].replace('\n', ''), None))
+    file.close()
 
-print('Cat 0 name: ', cats[0].catName, '. Cat 0 subs: ', cats[0].subCats)
-print('Cat 1 name: ', cats[1].catName, '. Cat 1 subs: ', cats[1].subCats)
-        
+with open('catClasses.txt', 'w') as file:
+    for c in cats:
+        file.write('Cat Name: {} | Sub Cats : {}\n'.format(c.catName, c.subCats))
+    file.close()
+
+for c in cats:
+    print(c.subCats)
 
 
 client = commands.Bot(command_prefix=prefix)
@@ -78,27 +103,47 @@ async def on_message(message):
         return
     elif message.content.startswith(prefix):
         if 'create' in message.content: #Creates a 'class' (category w/ roles, permissions, vc, and text chat)
+            await message.channel.send(content='Creating...')
 
-
-
-
-
-            for i in range(3):
+            for c in cats: 
                 global createdCategories
                 global createdRoles
                 global createdText
                 global createdVoice
-                category = await message.guild.create_category_channel(name='CLASS', reason='Automajically generated')
-                role = await message.guild.create_role(name='TEST')
-                await category.set_permissions(message.guild.default_role, overwrite=overwrite1, reason='bbbrole')
-                await category.set_permissions(role, overwrite=overwrite2, reason='bbbrole')
-                text = await category.create_text_channel(name='Text TEST', reason='m')
-                voice = await category.create_voice_channel(name='Voice TEST', reason='Lebron Jamas')
+                category = await message.guild.create_category_channel(name=c.catName, reason='Automajically generated')
                 createdCategories.append(category)
-                createdRoles.append(role)
-                createdText.append(text)
-                createdVoice.append(voice)
+                await category.set_permissions(message.guild.default_role, overwrite=overwrite1, reason='bbbrole')
+                if len(c.subCats) > 1: 
+                    genText = await category.create_text_channel(name='General Chat', topic='Chat for students of ' + c.catName, reason='m')
+                    createdText.append(genText)
+                    genVoice = await category.create_voice_channel(name='Voice Chat', reason='Lebron Jamas')
+                    createdVoice.append(genVoice)
+                    await genText.set_permissions(message.guild.default_role, overwrite=overwrite1, reason='bbbrole')
+                    await genVoice.set_permissions(message.guild.default_role, overwrite=overwrite1, reason='bbbrole')
+                    for r in c.subCats:
+                        role = await message.guild.create_role(name=r, reason='bbbrole')
+                        createdRoles.append(role)
+                        text = await category.create_text_channel(name=r, topic='Chat for students in ' + r, reason='m')
+                        createdText.append(text)
+                        await text.set_permissions(message.guild.default_role, overwrite=overwrite1, reason='bbbrole')
+                        await text.set_permissions(role, overwrite=overwrite2, reason='bbbrole')
+                        await genText.set_permissions(role, overwrite=overwrite2, reason='bbbrole')
+                        await genVoice.set_permissions(role, overwrite=overwrite2, reason='bbbrole')
+                else:
+                    role = await message.guild.create_role(name=c.catName, reason='bbbrole')
+                    await category.set_permissions(role, overwrite=overwrite2, reason='bbbrole')
+                    text = await category.create_text_channel(name=c.catName, topic='Chat for students in ' + c.catName, reason='m')
+                    voice = await category.create_voice_channel(name='Voice Chat', reason='Lebron Jamas')
+                    createdRoles.append(role)
+                    createdText.append(text)
+                    createdVoice.append(voice)
+
+            await message.channel.send(content='Done! Use `!undo` to undo that mess I just made')
+
+
         if 'undo' in message.content: #Undoes any and all classes created by the previous function
+            await message.channel.send(content='Undoing...')
+
             i = 0
             while i < len(createdRoles):
                 await createdRoles[i].delete(reason='undo')
@@ -115,6 +160,8 @@ async def on_message(message):
             while i < len(createdCategories):
                 await createdCategories[i].delete(reason='undo')
                 i+=1
+
+            await message.channel.send(content='Done!')
 
             createdRoles = []
             createdCategories = []
