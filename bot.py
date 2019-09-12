@@ -1,5 +1,5 @@
 #---
-#TODO: Create a tool to read sprague classes from a file - IN PROGRESS
+#TODO: Auto-post announcements to #annuoncements channel daily
 #TODO: Censorship warning system
 #TODO: Connect to a student database to auto-assign roles and nick-names? Same system that does schedule changes with
 #      student ID, first letter of last name, email, etc. (Doubt we would get access... unless..?)
@@ -14,9 +14,12 @@ from discord.ext import commands
 
 
 class Cat:
-    def __init__(self, name, list subs):
+    def __init__(self, name, subs):
         self.catName = name
         self.subCats = []
+        self.combine()
+
+    def combine(self):
         self.subCats += subs
 
 
@@ -30,7 +33,7 @@ with open('info.json', 'r') as json_file:
     json_file.close()
 
 with open('classes.txt', 'r') as file:
-    lineCount = 25
+    lineCount = 10
     lines = []
     for l in range(lineCount):
         lines.append(file.readline())
@@ -65,9 +68,6 @@ with open('catClasses.txt', 'w') as file:
     for c in cats:
         file.write('Cat Name: {} | Sub Cats : {}\n'.format(c.catName, c.subCats))
     file.close()
-
-for c in cats:
-    print(c.subCats)
 
 
 client = commands.Bot(command_prefix=prefix)
@@ -110,30 +110,30 @@ async def on_message(message):
                 global createdRoles
                 global createdText
                 global createdVoice
-                category = await message.guild.create_category_channel(name=c.catName, reason='Automajically generated')
+                category = await message.guild.create_category_channel(name=c.catName, reason='Automatically Generated')
                 createdCategories.append(category)
-                await category.set_permissions(message.guild.default_role, overwrite=overwrite1, reason='bbbrole')
+                await category.set_permissions(message.guild.default_role, overwrite=overwrite1, reason='Automatically Generated')
                 if len(c.subCats) > 1: 
-                    genText = await category.create_text_channel(name='General Chat', topic='Chat for students of ' + c.catName, reason='m')
+                    genText = await category.create_text_channel(name='General Chat', topic='Chat for students in ' + c.catName, reason='Automatically Generated')
                     createdText.append(genText)
-                    genVoice = await category.create_voice_channel(name='Voice Chat', reason='Lebron Jamas')
+                    genVoice = await category.create_voice_channel(name='Voice Chat', reason='Automatically Generated')
                     createdVoice.append(genVoice)
-                    await genText.set_permissions(message.guild.default_role, overwrite=overwrite1, reason='bbbrole')
-                    await genVoice.set_permissions(message.guild.default_role, overwrite=overwrite1, reason='bbbrole')
+                    await genText.set_permissions(message.guild.default_role, overwrite=overwrite1, reason='Automatically Generated')
+                    await genVoice.set_permissions(message.guild.default_role, overwrite=overwrite1, reason='Automatically Generated')
                     for r in c.subCats:
-                        role = await message.guild.create_role(name=r, reason='bbbrole')
+                        role = await message.guild.create_role(name=r, reason='Automatically Generated')
                         createdRoles.append(role)
-                        text = await category.create_text_channel(name=r, topic='Chat for students in ' + r, reason='m')
+                        text = await category.create_text_channel(name=r, topic='Chat for students in ' + r, reason='Automatically Generated')
                         createdText.append(text)
-                        await text.set_permissions(message.guild.default_role, overwrite=overwrite1, reason='bbbrole')
-                        await text.set_permissions(role, overwrite=overwrite2, reason='bbbrole')
-                        await genText.set_permissions(role, overwrite=overwrite2, reason='bbbrole')
-                        await genVoice.set_permissions(role, overwrite=overwrite2, reason='bbbrole')
+                        await text.set_permissions(message.guild.default_role, overwrite=overwrite1, reason='Automatically Generated')
+                        await text.set_permissions(role, overwrite=overwrite2, reason='Automatically Generated')
+                        await genText.set_permissions(role, overwrite=overwrite2, reason='Automatically Generated')
+                        await genVoice.set_permissions(role, overwrite=overwrite2, reason='Automatically Generated')
                 else:
-                    role = await message.guild.create_role(name=c.catName, reason='bbbrole')
-                    await category.set_permissions(role, overwrite=overwrite2, reason='bbbrole')
-                    text = await category.create_text_channel(name=c.catName, topic='Chat for students in ' + c.catName, reason='m')
-                    voice = await category.create_voice_channel(name='Voice Chat', reason='Lebron Jamas')
+                    role = await message.guild.create_role(name=c.catName, reason='Automatically Generated')
+                    await category.set_permissions(role, overwrite=overwrite2, reason='Automatically Generated')
+                    text = await category.create_text_channel(name=c.catName, topic='Chat for students in ' + c.catName, reason='Automatically Generated')
+                    voice = await category.create_voice_channel(name='Voice Chat', reason='Automatically Generated')
                     createdRoles.append(role)
                     createdText.append(text)
                     createdVoice.append(voice)
@@ -146,19 +146,19 @@ async def on_message(message):
 
             i = 0
             while i < len(createdRoles):
-                await createdRoles[i].delete(reason='undo')
+                await createdRoles[i].delete(reason='Undo')
                 i+=1
             i = 0
             while i < len(createdVoice):
-                await createdVoice[i].delete(reason='undo')
+                await createdVoice[i].delete(reason='Undo')
                 i+=1
             i = 0
             while i < len(createdText):
-                await createdText[i].delete(reason='undo')
+                await createdText[i].delete(reason='Undo')
                 i+=1
             i = 0
             while i < len(createdCategories):
-                await createdCategories[i].delete(reason='undo')
+                await createdCategories[i].delete(reason='Undo')
                 i+=1
 
             await message.channel.send(content='Done!')
