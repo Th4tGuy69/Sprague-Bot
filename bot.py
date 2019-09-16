@@ -1,5 +1,5 @@
 # ---
-# TODO: Censorship warning system
+# TODO: Censorship warning system, download image to check for adult content, read text, and keep track of who has recieved warnings and why
 # TODO: Connect to a student database to auto-assign roles and nick-names? Same system that does schedule changes with
 #      student ID, first letter of last name, email, etc. (Doubt we would get access... unless..?)
 # TODO: Try to make this ass professional as possible :) - IN PROGRESS
@@ -8,11 +8,14 @@
 import re
 import sys
 import json
+import image
 import discord
 import requests
+import pytesseract
 import datetime as dt
 from bs4 import BeautifulSoup
 from discord.ext import commands
+from sightengine.client import SightengineClient
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 
@@ -35,6 +38,7 @@ with open('info.json', 'r') as json_file:
 
 
 client = commands.Bot(command_prefix=prefix)
+sight = SightengineClient('1428354798', 'HbyKWBXNC2T96rYbaeGD')
 
 
 @client.event
@@ -58,6 +62,10 @@ async def on_member_join(member):
 async def on_message(message):
     if message.author == client.user:
         return
+    elif message.attachments != None:
+        for a in message.attachments:
+            output = sight.check('nudity','wad','offensive','text').set_url(a.proxy_url)
+            print(output)
 
 
 # Web crawler grabs announcements, modifys, then posts to id=619772443116175370
