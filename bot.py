@@ -5,18 +5,20 @@
 # TODO: Try to make this ass professional as possible :) - IN PROGRESS
 # ---
 
+#region Imports
 import re
 import sys
 import json
-import image
 import discord
 import requests
 import pytesseract
 import datetime as dt
+from PIL import Image
 from bs4 import BeautifulSoup
 from discord.ext import commands
 from sightengine.client import SightengineClient
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+#endregion
 
 
 emojiA = 'https://i.imgur.com/dmTKeTi.png'
@@ -39,6 +41,10 @@ with open('info.json', 'r') as json_file:
 
 client = commands.Bot(command_prefix=prefix)
 sight = SightengineClient('1428354798', 'HbyKWBXNC2T96rYbaeGD')
+
+
+output = pytesseract.image_to_string(Image.open('images/test_image.png').convert("RGB"), lang='eng')
+print(output)
 
 
 @client.event
