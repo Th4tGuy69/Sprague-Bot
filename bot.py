@@ -5,10 +5,11 @@
 # TODO: Try to make this ass professional as possible :) - IN PROGRESS
 # ---
 
-#region Imports
+# region Imports
 import re
 import sys
 import json
+import sqlite3
 import discord
 import requests
 import pytesseract
@@ -19,7 +20,21 @@ from bs4 import BeautifulSoup
 from discord.ext import commands
 from sightengine.client import SightengineClient
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-#endregion 
+# endregion
+
+db = sqlite3.connect('warned.db')
+sq = db.cursor()
+
+#sq.execute('create table people (name_last, age)')
+sq.execute('insert into people values (?, ?)', ('wasd', 1))
+print(sq.fetchone())
+sq.execute('insert into people values (?, ?)', ('YEET', 2))
+
+print(sq.fetchone())
+
+db.commit()
+
+
 
 
 emojiA = 'https://i.imgur.com/dmTKeTi.png'
@@ -44,10 +59,10 @@ client = commands.Bot(command_prefix=prefix)
 sight = SightengineClient('1428354798', 'HbyKWBXNC2T96rYbaeGD')
 
 
-#https://digi.bib.uni-mannheim.de/tesseract/tesseract-ocr-w64-setup-v5.0.0-alpha.20190708.exe
-#https://stackoverflow.com/questions/42831662/python-install-tesseract-for-windows-7
+# https://digi.bib.uni-mannheim.de/tesseract/tesseract-ocr-w64-setup-v5.0.0-alpha.20190708.exe
+# https://stackoverflow.com/questions/42831662/python-install-tesseract-for-windows-7
 #output = pytesseract.image_to_string(Image.open('images/test_image.png').convert("RGB"), lang='eng')
-#print(output)
+# print(output)
 
 
 @client.event
@@ -62,7 +77,7 @@ async def on_ready():
 # Sends new users a message on joining the guild, TODO:Test and replace embed with something more professional
 @client.event
 async def on_member_join(member):
-    embed = discord.Embed(title='*beep boop*',
+    embed = discord.Embed(title='*beep boop*',  # TODO: Check if username contains 'bad words'
                           type='rich', description='Bot text')
     await member.send(embed=embed)
 
@@ -73,21 +88,49 @@ async def on_message(message):
         return
     elif message.attachments != None:
         for a in message.attachments:
-            output = sight.check('nudity','wad','offensive','text').set_url(a.proxy_url)
+            output = sight.check('nudity', 'wad', 'offensive',
+                                 'text').set_url(a.proxy_url)
             if output['status'] == 'success':
-                #check nudity
-                NotImplemented
-                #check weapons, alcohol, & drugs
-                NotImplemented
-                #check offensive
-                NotImplemented
-                #check text
-                if output['text']['has_artificial'] or output['text']['has_natural'] > 0.5:
+                # check nudity
+                if output['nudity']['raw'] > 0.35:
+                    print('\nRAW NUDITY')
+                if output['nudity']['partial'] > 0.35:
+                    print('\nPARTIAL NUDITY')
+
+                # check weapons, alcohol, & drugs
+                if output['weapon'] > 0.5:
+                    print('\nWEAPON')
+                if output['alcohol'] > 0.5:
+                    print('\nALCOHOL')
+                if output['drugs'] > 0.5:
+                    print('\nDRUGS')
+
+                # check offensive
+                if output['offensive']['prob'] > 0.5:
+                    print('\nOFFENSIVE')
+
+                # check text
+                '''if output['text']['has_artificial'] or output['text']['has_natural'] > 0.5:
                     text = pytesseract.image_to_string(Image.open(BytesIO(requests.get(a.proxy_url).content)).convert("RGB"), lang='eng')
-                    print(text) #TODO: Check this against a list of 'bad words'
-                
+                    print(text) #TODO: Check this against a list of 'bad words'''
+
                 with open('test.json', 'w') as outfile:
                     json.dump(output, outfile, indent=4)
+                outfile.close()
+
+
+def Warn(reasons, img_url):
+    embed = discord.Embed(title='WARNING', type='rich', color=0xf04923)
+    embed.set_author(name='Sprague Bot', url='https://github.com/Th4tGuy69/Sprague-Bot',
+                     icon_url='http://spraguehs.com/images/oly-logos/Victory%20O%20Orange.png')
+    #with open('warned.json', 'r') as warned:
+        #data = json.load(warned)
+        #for people in data['']
+
+    #if 
+    embed.add_field(name='', value='', inline=False)
+    embed.set_image(url=img_url)
+    embed.set_footer(text='Remember to make it a great day!')
 
 
 # Web crawler grabs announcements, modifys, then posts to id=619772443116175370
