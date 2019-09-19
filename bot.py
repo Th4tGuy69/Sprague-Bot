@@ -14,11 +14,12 @@ import requests
 import pytesseract
 import datetime as dt
 from PIL import Image
+from io import BytesIO
 from bs4 import BeautifulSoup
 from discord.ext import commands
 from sightengine.client import SightengineClient
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-#endregion
+#endregion 
 
 
 emojiA = 'https://i.imgur.com/dmTKeTi.png'
@@ -43,8 +44,10 @@ client = commands.Bot(command_prefix=prefix)
 sight = SightengineClient('1428354798', 'HbyKWBXNC2T96rYbaeGD')
 
 
-output = pytesseract.image_to_string(Image.open('images/test_image.png').convert("RGB"), lang='eng')
-print(output)
+#https://digi.bib.uni-mannheim.de/tesseract/tesseract-ocr-w64-setup-v5.0.0-alpha.20190708.exe
+#https://stackoverflow.com/questions/42831662/python-install-tesseract-for-windows-7
+#output = pytesseract.image_to_string(Image.open('images/test_image.png').convert("RGB"), lang='eng')
+#print(output)
 
 
 @client.event
@@ -71,7 +74,20 @@ async def on_message(message):
     elif message.attachments != None:
         for a in message.attachments:
             output = sight.check('nudity','wad','offensive','text').set_url(a.proxy_url)
-            print(output)
+            if output['status'] == 'success':
+                #check nudity
+                NotImplemented
+                #check weapons, alcohol, & drugs
+                NotImplemented
+                #check offensive
+                NotImplemented
+                #check text
+                if output['text']['has_artificial'] or output['text']['has_natural'] > 0.5:
+                    text = pytesseract.image_to_string(Image.open(BytesIO(requests.get(a.proxy_url).content)).convert("RGB"), lang='eng')
+                    print(text) #TODO: Check this against a list of 'bad words'
+                
+                with open('test.json', 'w') as outfile:
+                    json.dump(output, outfile, indent=4)
 
 
 # Web crawler grabs announcements, modifys, then posts to id=619772443116175370

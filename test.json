@@ -1,0 +1,45 @@
+{
+    "status": "success",
+    "request": {
+        "id": "req_5Zh1yUQLaPLxFUYxz3zuF",
+        "timestamp": 1568859542.290053,
+        "operations": 4
+    },
+    "weapon": 0.013000000000000001,
+    "alcohol": 0,
+    "drugs": 0,
+    "nudity": {
+        "raw": 0.01,
+        "safe": 0.98,
+        "partial": 0.01
+    },
+    "text": {
+        "has_artificial": 0.997,
+        "has_natural": 0.1994,
+        "boxes": [
+            {
+                "x1": 0.00828,
+                "y1": 0.38344,
+                "x2": 0.93539,
+                "y2": 0.96037,
+                "label": "text-artificial",
+                "prob": 0.997
+            },
+            {
+                "x1": 0.0144,
+                "y1": 0.0096,
+                "x2": 0.96227,
+                "y2": 0.3207,
+                "label": "text-artificial",
+                "prob": 0.62
+            }
+        ]
+    },
+    "offensive": {
+        "prob": 0.01
+    },
+    "media": {
+        "id": "med_5Zh1IGfXgV6mjmMGaIoRl",
+        "uri": "https://media.discordapp.net/attachments/620167820558204928/624066888208613376/test_image.png"
+    }
+}
