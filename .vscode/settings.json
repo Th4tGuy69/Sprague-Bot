@@ -1,4 +1,13 @@
 {
     "python.pythonPath": "C:\\Users\\ThatG\\AppData\\Local\\Programs\\Python\\Python36-32\\python.exe",
-    "python.jediEnabled": true
+    "python.jediEnabled": true,
+    "sqltools.connections": [
+        {
+            "askForPassword": true,
+            "database": ".\\warned.db",
+            "dialect": "SQLite",
+            "name": "warned"
+        }
+    ],
+    "sqltools.useNodeRuntime": true
 }

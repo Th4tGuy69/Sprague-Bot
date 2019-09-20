@@ -25,16 +25,27 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 db = sqlite3.connect('warned.db')
 sq = db.cursor()
 
-#sq.execute('create table people (name_last, age)')
-sq.execute('insert into people values (?, ?)', ('wasd', 1))
-print(sq.fetchone())
-sq.execute('insert into people values (?, ?)', ('YEET', 2))
 
-print(sq.fetchone())
+#sq.execute('''CREATE TABLE warned 
+#              (last_first text, user_id integer, warnings integer, banned integer)''')
+
+'''
+values = [
+    ('Garrett Caden', 147926148616159233, 1, False),
+    ('Millett Jordan', 271357265913577475, 2, False),
+    ('Curtis Olivia', 266370235525758987, 3, True),
+    ]
+'''
+
+#sq.executemany('INSERT INTO warned VALUES (?,?,?,?)', values)
+#sq.execute('SELECT * FROM warned WHERE symbol=?', '')
+
+for row in sq.execute('SELECT * FROM warned ORDER BY last_first'):
+    print(row)
 
 db.commit()
 
-
+#db.close()
 
 
 emojiA = 'https://i.imgur.com/dmTKeTi.png'
@@ -91,43 +102,53 @@ async def on_message(message):
             output = sight.check('nudity', 'wad', 'offensive',
                                  'text').set_url(a.proxy_url)
             if output['status'] == 'success':
+                offenses = []
+
                 # check nudity
                 if output['nudity']['raw'] > 0.35:
-                    print('\nRAW NUDITY')
+                    offenses.append('RAW NUDITY')
                 if output['nudity']['partial'] > 0.35:
-                    print('\nPARTIAL NUDITY')
+                    offenses.append('PARTIAL NUDITY')
 
                 # check weapons, alcohol, & drugs
                 if output['weapon'] > 0.5:
-                    print('\nWEAPON')
+                    offenses.append('WEAPON')
                 if output['alcohol'] > 0.5:
-                    print('\nALCOHOL')
+                    offenses.append('ALCOHOL')
                 if output['drugs'] > 0.5:
-                    print('\nDRUGS')
+                    offenses.append('DRUGS')
 
                 # check offensive
                 if output['offensive']['prob'] > 0.5:
-                    print('\nOFFENSIVE')
+                    offenses.append('OFFENSIVE')
 
                 # check text
                 '''if output['text']['has_artificial'] or output['text']['has_natural'] > 0.5:
                     text = pytesseract.image_to_string(Image.open(BytesIO(requests.get(a.proxy_url).content)).convert("RGB"), lang='eng')
                     print(text) #TODO: Check this against a list of 'bad words'''
 
+                if len(offenses) > 0:
+                    Warn(offenses, message.author.id, a.proxy_url)
+
                 with open('test.json', 'w') as outfile:
                     json.dump(output, outfile, indent=4)
                 outfile.close()
 
 
-def Warn(reasons, img_url):
+def Warn(reasons, user, img_url):
+    #check if user is in db, if not add, if so add to warnings
+    temp = sq.execute('SELECT * FROM warned WHERE user_id=?', user)
+    if temp != None:
+        print(True)
+
     embed = discord.Embed(title='WARNING', type='rich', color=0xf04923)
     embed.set_author(name='Sprague Bot', url='https://github.com/Th4tGuy69/Sprague-Bot',
                      icon_url='http://spraguehs.com/images/oly-logos/Victory%20O%20Orange.png')
-    #with open('warned.json', 'r') as warned:
-        #data = json.load(warned)
-        #for people in data['']
+    # with open('warned.json', 'r') as warned:
+    #data = json.load(warned)
+    # for people in data['']
 
-    #if 
+    # if
     embed.add_field(name='', value='', inline=False)
     embed.set_image(url=img_url)
     embed.set_footer(text='Remember to make it a great day!')
