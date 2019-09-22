@@ -1,37 +1,27 @@
 {
     "status": "success",
     "request": {
-        "id": "req_5ZHoEyZdP1AmgSulmkivK",
-        "timestamp": 1568957653.5948,
+        "id": "req_60uzfbbFWwUrDLRhr8T3i",
+        "timestamp": 1569140630.3781,
         "operations": 4
     },
-    "weapon": 0.0065,
+    "weapon": 0.619,
     "alcohol": 0.001,
-    "drugs": 0.001,
+    "drugs": 0,
     "nudity": {
         "raw": 0.01,
         "safe": 0.98,
         "partial": 0.01
     },
     "text": {
-        "has_artificial": 0.1098,
-        "has_natural": 0.549,
-        "boxes": [
-            {
-                "x1": 0.42712,
-                "y1": 0.1952,
-                "x2": 0.66007,
-                "y2": 0.2463,
-                "label": "text-natural",
-                "prob": 0.549
-            }
-        ]
+        "has_artificial": 0.01,
+        "has_natural": 0.01
     },
     "offensive": {
         "prob": 0.01
     },
     "media": {
-        "id": "med_5ZHojbdoCP05LU6ufh68x",
-        "uri": "https://media.discordapp.net/attachments/620167820558204928/624478397007134721/bad.jpg"
+        "id": "med_60uzqyMhuO8FJoIBHGEJJ",
+        "uri": "https://media.discordapp.net/attachments/620167820558204928/625245855976521739/gun.png"
     }
 }

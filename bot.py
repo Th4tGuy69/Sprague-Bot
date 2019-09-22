@@ -22,11 +22,7 @@ from sightengine.client import SightengineClient
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 # endregion
 
-db = sqlite3.connect('warned.db')
-sq = db.cursor()
-
-
-#sq.execute('''CREATE TABLE warned 
+# sq.execute('''CREATE TABLE warned
 #              (last_first text, user_id integer, warnings integer, banned integer)''')
 
 '''
@@ -40,21 +36,29 @@ values = [
 #sq.executemany('INSERT INTO warned VALUES (?,?,?,?)', values)
 #sq.execute('SELECT * FROM warned WHERE symbol=?', '')
 
-for row in sq.execute('SELECT * FROM warned ORDER BY last_first'):
-    print(row)
+#db.commit()
 
-db.commit()
-
-#db.close()
+# db.close()
 
 
 emojiA = 'https://i.imgur.com/dmTKeTi.png'
 emojiB = 'https://i.imgur.com/oLJnbDL.png'
 emojiAB = 'https://i.imgur.com/dVOtgZq.png'
+emojiAnnouncements = 'https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/228/public-address-loudspeaker_1f4e2.png'
+emojiExclamation = 'https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/228/double-exclamation-mark_203c.png'
 announcements = []
 date = ''
 dayType = ''
-global embed
+
+async def openDB():
+    global db
+    global sq
+    db = sqlite3.connect('warned.db')
+    sq = db.cursor()
+
+async def closeDB():
+    db.commit()
+    db.close()
 
 
 # Grab bot token and prefix from file, TODO: If we have any actual user commands, make the prefix changable
@@ -84,8 +88,15 @@ async def on_ready():
     print('Running on python version: ', sys.version.split(' ')[0])
     print('Ready to use\n')
 
+    '''await openDB()
+    for row in sq.execute('SELECT * FROM warned ORDER BY last_first'):
+        print(row)
+    await closeDB()'''
 
-# Sends new users a message on joining the guild, TODO:Test and replace embed with something more professional
+
+# Sends new users a message on joining the guild
+# TODO: Test and replace embed with something more professional
+# TODO: Add new users to SQLite Database
 @client.event
 async def on_member_join(member):
     embed = discord.Embed(title='*beep boop*',  # TODO: Check if username contains 'bad words'
@@ -98,7 +109,7 @@ async def on_message(message):
     if message.author == client.user:
         return
     elif message.attachments != None:
-        for a in message.attachments:
+        for a in message.attachments:  # TODO: Doesn't detect image if sent by url
             output = sight.check('nudity', 'wad', 'offensive',
                                  'text').set_url(a.proxy_url)
             if output['status'] == 'success':
@@ -128,30 +139,44 @@ async def on_message(message):
                     print(text) #TODO: Check this against a list of 'bad words'''
 
                 if len(offenses) > 0:
-                    Warn(offenses, message.author.id, a.proxy_url)
+                    await Warn(offenses, message, a.proxy_url)
 
                 with open('test.json', 'w') as outfile:
                     json.dump(output, outfile, indent=4)
                 outfile.close()
 
 
-def Warn(reasons, user, img_url):
-    #check if user is in db, if not add, if so add to warnings
-    temp = sq.execute('SELECT * FROM warned WHERE user_id=?', user)
-    if temp != None:
-        print(True)
+async def Warn(reasons, message, img_url):
+    # add to user's warnings, if > 3 then ban
+    await openDB()
+    sq.execute('SELECT warnings FROM warned WHERE user_id=?',
+               (message.author.id,))
+    temp = sq.fetchone()
+    warnings = temp[0] + 1
+    banned = False
 
     embed = discord.Embed(title='WARNING', type='rich', color=0xf04923)
     embed.set_author(name='Sprague Bot', url='https://github.com/Th4tGuy69/Sprague-Bot',
-                     icon_url='http://spraguehs.com/images/oly-logos/Victory%20O%20Orange.png')
-    # with open('warned.json', 'r') as warned:
-    #data = json.load(warned)
-    # for people in data['']
+                     icon_url=emojiExclamation)
 
-    # if
-    embed.add_field(name='', value='', inline=False)
+    if warnings == 1:
+        embed.add_field(
+            name='YOU POSTED CRINGE', value=':x::heavy_multiplication_x::heavy_multiplication_x:')
+    elif warnings == 2:
+        embed.add_field(
+            name='YOU POSTED CRINGE', value=':x::x::heavy_multiplication_x:')
+    elif warnings >= 3:
+        banned = True # TODO: Ban them fools
+        embed.add_field(name='YOU POSTED CRINGE', value=':x::x::x:')
+
     embed.set_image(url=img_url)
     embed.set_footer(text='Remember to make it a great day!')
+
+    await message.author.send(embed=embed) # TODO: Send to list of admins as documentation
+
+    sq.execute('UPDATE warned SET warnings = ?, banned = ? WHERE user_id=?', (warnings, banned, message.author.id,))
+
+    await closeDB()
 
 
 # Web crawler grabs announcements, modifys, then posts to id=619772443116175370
@@ -187,7 +212,7 @@ async def postAnnouncements():
     embed = discord.Embed(title='Announcements for **{}/{}/{}**, {}.'.format(date[1].replace(
         '0', ''), date[2], date[0][2:], dayType), type='rich', url='http://spragueannouncements.blogspot.com/', color=0xf04923)
     embed.set_author(name='Sprague Bot', url='https://github.com/Th4tGuy69/Sprague-Bot',
-                     icon_url='http://spraguehs.com/images/oly-logos/Victory%20O%20Orange.png')
+                     icon_url=emojiAnnouncements)
     embed.set_footer(text='Remember to make it a great day, everybody!')
     if dt.date.today().weekday() is 1 or 3:
         embed.set_thumbnail(url=emojiA)
