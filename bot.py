@@ -19,6 +19,7 @@ from io import BytesIO
 from bs4 import BeautifulSoup
 from discord.ext import commands
 from sightengine.client import SightengineClient
+from profanity_check import predict, predict_prob
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 # endregion
 
@@ -36,7 +37,7 @@ values = [
 #sq.executemany('INSERT INTO warned VALUES (?,?,?,?)', values)
 #sq.execute('SELECT * FROM warned WHERE symbol=?', '')
 
-#db.commit()
+# db.commit()
 
 # db.close()
 
@@ -46,15 +47,18 @@ emojiB = 'https://i.imgur.com/oLJnbDL.png'
 emojiAB = 'https://i.imgur.com/dVOtgZq.png'
 emojiAnnouncements = 'https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/228/public-address-loudspeaker_1f4e2.png'
 emojiExclamation = 'https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/228/double-exclamation-mark_203c.png'
+emojiWave = 'https://emojipedia-us.s3.dualstack.us-west-1.amazonaws.com/thumbs/120/twitter/228/waving-hand-sign_1f44b.png'
 announcements = []
 date = ''
 dayType = ''
+
 
 async def openDB():
     global db
     global sq
     db = sqlite3.connect('warned.db')
     sq = db.cursor()
+
 
 async def closeDB():
     db.commit()
@@ -95,13 +99,28 @@ async def on_ready():
 
 
 # Sends new users a message on joining the guild
-# TODO: Test and replace embed with something more professional
+# TODO: Test
+# TODO: Check username for profanity
 # TODO: Add new users to SQLite Database
 @client.event
 async def on_member_join(member):
-    embed = discord.Embed(title='*beep boop*',  # TODO: Check if username contains 'bad words'
-                          type='rich', description='Bot text')
+    temp = predict([member.name])
+    print(temp[0])
+
+    embed = discord.Embed(title='Hello `{}`!'.format(
+        member.name), type='rich', color=0xf04923)
+    embed.set_author(name='Sprague Bot',
+                     url='https://github.com/Th4tGuy69/Sprague-Bot', icon_url=emojiWave)
+    embed.set_footer(text='Remember to make it a great day')
+
+    embed.add_field(name='w', value='w')
+
     await member.send(embed=embed)
+
+    await openDB()
+    sq.execute('INSERT INTO warned VALUES (?,?,?,?)',
+               (name, member.id, 0, False,))
+    await closeDB()
 
 
 @client.event
@@ -166,15 +185,17 @@ async def Warn(reasons, message, img_url):
         embed.add_field(
             name='YOU POSTED CRINGE', value=':x::x::heavy_multiplication_x:')
     elif warnings >= 3:
-        banned = True # TODO: Ban them fools
+        banned = True  # TODO: Ban them fools
         embed.add_field(name='YOU POSTED CRINGE', value=':x::x::x:')
 
     embed.set_image(url=img_url)
     embed.set_footer(text='Remember to make it a great day!')
 
-    await message.author.send(embed=embed) # TODO: Send to list of admins as documentation
+    # TODO: Send to list of admins as documentation
+    await message.author.send(embed=embed)
 
-    sq.execute('UPDATE warned SET warnings = ?, banned = ? WHERE user_id=?', (warnings, banned, message.author.id,))
+    sq.execute('UPDATE warned SET warnings = ?, banned = ? WHERE user_id=?',
+               (warnings, banned, message.author.id,))
 
     await closeDB()
 
