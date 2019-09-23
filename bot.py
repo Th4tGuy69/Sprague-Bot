@@ -104,6 +104,7 @@ async def on_ready():
 # TODO: Add new users to SQLite Database
 @client.event
 async def on_member_join(member):
+    '''
     temp = predict([member.name])
     print(temp[0])
 
@@ -121,6 +122,7 @@ async def on_member_join(member):
     sq.execute('INSERT INTO warned VALUES (?,?,?,?)',
                (name, member.id, 0, False,))
     await closeDB()
+    '''
 
 
 @client.event
@@ -129,43 +131,49 @@ async def on_message(message):
         return
     elif message.attachments != None:
         for a in message.attachments:  # TODO: Doesn't detect image if sent by url
-            output = sight.check('nudity', 'wad', 'offensive',
-                                 'text').set_url(a.proxy_url)
-            if output['status'] == 'success':
-                offenses = []
+            #a.read(use_cached=True))
+            if a.url != None:
+                NotImplemented
+            elif False == True:
+                output = sight.check('nudity', 'wad', 'offensive',
+                                    'text').set_url(a.proxy_url)
+                if output['status'] == 'success':
+                    offenses = []
 
-                # check nudity
-                if output['nudity']['raw'] > 0.35:
-                    offenses.append('RAW NUDITY')
-                if output['nudity']['partial'] > 0.35:
-                    offenses.append('PARTIAL NUDITY')
+                    # check nudity
+                    if output['nudity']['raw'] > 0.35:
+                        offenses.append('RAW NUDITY')
+                    if output['nudity']['partial'] > 0.35:
+                        offenses.append('PARTIAL NUDITY')
 
-                # check weapons, alcohol, & drugs
-                if output['weapon'] > 0.5:
-                    offenses.append('WEAPON')
-                if output['alcohol'] > 0.5:
-                    offenses.append('ALCOHOL')
-                if output['drugs'] > 0.5:
-                    offenses.append('DRUGS')
+                    # check weapons, alcohol, & drugs
+                    if output['weapon'] > 0.5:
+                        offenses.append('WEAPON')
+                    if output['alcohol'] > 0.5:
+                        offenses.append('ALCOHOL')
+                    if output['drugs'] > 0.5:
+                        offenses.append('DRUGS')
 
-                # check offensive
-                if output['offensive']['prob'] > 0.5:
-                    offenses.append('OFFENSIVE')
+                    # check offensive
+                    if output['offensive']['prob'] > 0.5:
+                        offenses.append('OFFENSIVE')
 
-                # check text
-                '''if output['text']['has_artificial'] or output['text']['has_natural'] > 0.5:
-                    text = pytesseract.image_to_string(Image.open(BytesIO(requests.get(a.proxy_url).content)).convert("RGB"), lang='eng')
-                    print(text) #TODO: Check this against a list of 'bad words'''
+                    # check text
+                    '''if output['text']['has_artificial'] or output['text']['has_natural'] > 0.5:
+                        text = pytesseract.image_to_string(Image.open(BytesIO(requests.get(a.proxy_url).content)).convert("RGB"), lang='eng')
+                        print(text) #TODO: Check this against a list of 'bad words'''
 
-                if len(offenses) > 0:
-                    await Warn(offenses, message, a.proxy_url)
+                    if len(offenses) > 0:
+                        await Warn(offenses, message, a.proxy_url)
 
-                with open('test.json', 'w') as outfile:
-                    json.dump(output, outfile, indent=4)
-                outfile.close()
+                    with open('test.json', 'w') as outfile:
+                        json.dump(output, outfile, indent=4)
+                    outfile.close()
+                else:
+                    NotImplemented #TODO: Have admins manually review
 
 
-async def Warn(reasons, message, img_url):
+async def Warn(offences, message, img_url):
     # add to user's warnings, if > 3 then ban
     await openDB()
     sq.execute('SELECT warnings FROM warned WHERE user_id=?',
@@ -178,15 +186,17 @@ async def Warn(reasons, message, img_url):
     embed.set_author(name='Sprague Bot', url='https://github.com/Th4tGuy69/Sprague-Bot',
                      icon_url=emojiExclamation)
 
+    text = 'YOU POSTED AN IMAGE CONTAINING: `{}`'.format(', '.join(offences))
+
     if warnings == 1:
         embed.add_field(
-            name='YOU POSTED CRINGE', value=':x::heavy_multiplication_x::heavy_multiplication_x:')
+            name=text, value=':x::heavy_multiplication_x::heavy_multiplication_x:')
     elif warnings == 2:
         embed.add_field(
-            name='YOU POSTED CRINGE', value=':x::x::heavy_multiplication_x:')
+            name=text, value=':x::x::heavy_multiplication_x:')
     elif warnings >= 3:
         banned = True  # TODO: Ban them fools
-        embed.add_field(name='YOU POSTED CRINGE', value=':x::x::x:')
+        embed.add_field(name=text, value=':x::x::x:')
 
     embed.set_image(url=img_url)
     embed.set_footer(text='Remember to make it a great day!')
@@ -242,11 +252,11 @@ async def postAnnouncements():
     elif dt.date.today().weekday() is 0:
         embed.set_thumbnail(url=emojiAB)
     for announcement in announcements:
-        try:
-            embed.add_field(name='⸻\t\t\t⸻\t\t\t⸻\t\t\t⸻\t\t\t⸻',
-                            value=announcement, inline=False)
-        finally:
-            pass
+        if len(announcement) > 1024:
+            announcement = announcement[:1021] + '...'
+            
+        embed.add_field(name='⸻\t\t\t⸻\t\t\t⸻\t\t\t⸻\t\t\t⸻',
+                        value=announcement)
 
     await client.get_channel(619772443116175370).send(embed=embed)
 
