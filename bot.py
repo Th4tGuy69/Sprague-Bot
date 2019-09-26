@@ -23,24 +23,6 @@ from profanity_check import predict, predict_prob
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 # endregion
 
-# sq.execute('''CREATE TABLE warned
-#              (last_first text, user_id integer, warnings integer, banned integer)''')
-
-'''
-values = [
-    ('Garrett Caden', 147926148616159233, 1, False),
-    ('Millett Jordan', 271357265913577475, 2, False),
-    ('Curtis Olivia', 266370235525758987, 3, True),
-    ]
-'''
-
-#sq.executemany('INSERT INTO warned VALUES (?,?,?,?)', values)
-#sq.execute('SELECT * FROM warned WHERE symbol=?', '')
-
-# db.commit()
-
-# db.close()
-
 
 emojiA = 'https://i.imgur.com/dmTKeTi.png'
 emojiB = 'https://i.imgur.com/oLJnbDL.png'
@@ -52,6 +34,23 @@ announcements = []
 date = ''
 dayType = ''
 
+#await openDB()
+
+#sq.execute('''CREATE TABLE warned (first_last text, user_id integer, warnings integer, banned integer)''')
+'''
+values = [
+    ('Caden Garrett', 147926148616159233, 0, False),
+    ('Jordan Millett', 271357265913577475, 0, False),
+    ('Ethan Hardey', 215663731672088576, 0, False),
+    ('Joseph Byers', 242482798986788864, 0, False),
+    ('Kyle Rudisil', 193065926206160896, 0, False)
+    ]
+
+sq.executemany('INSERT INTO warned VALUES (?,?,?,?)', values)
+#sq.execute('SELECT * FROM warned WHERE symbol=?', '')
+
+await closeDB()
+'''
 
 async def openDB():
     global db
@@ -76,13 +75,10 @@ with open('info.json', 'r') as json_file:
 
 client = commands.Bot(command_prefix=prefix)
 sight = SightengineClient('1428354798', 'HbyKWBXNC2T96rYbaeGD')
-
+pytesseract.pytesseract.tesseract_cmd = r'C:/Program Files (x86)/Tesseract-OCR/tesseract.exe'
 
 # https://digi.bib.uni-mannheim.de/tesseract/tesseract-ocr-w64-setup-v5.0.0-alpha.20190708.exe
-# https://stackoverflow.com/questions/42831662/python-install-tesseract-for-windows-7
-#output = pytesseract.image_to_string(Image.open('images/test_image.png').convert("RGB"), lang='eng')
-# print(output)
-
+# https://stackoverflow.com/questions/50951955/pytesseract-tesseractnotfound-error-tesseract-is-not-installed-or-its-not-i
 
 @client.event
 async def on_ready():
@@ -91,11 +87,6 @@ async def on_ready():
     print('Using discord.py version: ', discord.__version__)
     print('Running on python version: ', sys.version.split(' ')[0])
     print('Ready to use\n')
-
-    '''await openDB()
-    for row in sq.execute('SELECT * FROM warned ORDER BY last_first'):
-        print(row)
-    await closeDB()'''
 
 
 # Sends new users a message on joining the guild
@@ -131,12 +122,20 @@ async def on_message(message):
         return
     elif message.attachments != None:
         for a in message.attachments:  # TODO: Doesn't detect image if sent by url
-            #a.read(use_cached=True))
-            if a.url != None:
-                NotImplemented
-            elif False == True:
+            # a.read(use_cached=True))
+            #if a.url != None:
+                #NotImplemented
+            if True == True:
+                responce = requests.get(a.proxy_url)
+                img = Image.open(BytesIO(responce.content))
+                text = pytesseract.image_to_string(Image.open(BytesIO(requests.get(a.proxy_url).content))) #ughhhhh
+                prob = predict_prob([text])
+                print(text, ': ', prob, '%: ', a.proxy_url)
+
+                return 0
+
                 output = sight.check('nudity', 'wad', 'offensive',
-                                    'text').set_url(a.proxy_url)
+                                     'text').set_url(a.proxy_url)
                 if output['status'] == 'success':
                     offenses = []
 
@@ -147,7 +146,7 @@ async def on_message(message):
                         offenses.append('PARTIAL NUDITY')
 
                     # check weapons, alcohol, & drugs
-                    if output['weapon'] > 0.5:
+                    if output['weapon'] > 0.4:
                         offenses.append('WEAPON')
                     if output['alcohol'] > 0.5:
                         offenses.append('ALCOHOL')
@@ -161,16 +160,18 @@ async def on_message(message):
                     # check text
                     '''if output['text']['has_artificial'] or output['text']['has_natural'] > 0.5:
                         text = pytesseract.image_to_string(Image.open(BytesIO(requests.get(a.proxy_url).content)).convert("RGB"), lang='eng')
-                        print(text) #TODO: Check this against a list of 'bad words'''
+                        prob = predict_prob([text])
+                        print(prob) #TODO: Check this against a list of 'bad words'''
 
                     if len(offenses) > 0:
+                        await message.delete()
                         await Warn(offenses, message, a.proxy_url)
 
                     with open('test.json', 'w') as outfile:
                         json.dump(output, outfile, indent=4)
                     outfile.close()
                 else:
-                    NotImplemented #TODO: Have admins manually review
+                    NotImplemented  # TODO: Have admins manually review
 
 
 async def Warn(offences, message, img_url):
@@ -214,7 +215,8 @@ async def Warn(offences, message, img_url):
 async def postAnnouncements():
     announcements.clear()
 
-    date = str(dt.date.today()).split('-')
+    today = dt.date.today()
+    date = str(today).split('-')
 
     if dt.date.today().weekday() is 1 or 3:
         dayType = 'an **A** day'
@@ -244,7 +246,8 @@ async def postAnnouncements():
         '0', ''), date[2], date[0][2:], dayType), type='rich', url='http://spragueannouncements.blogspot.com/', color=0xf04923)
     embed.set_author(name='Sprague Bot', url='https://github.com/Th4tGuy69/Sprague-Bot',
                      icon_url=emojiAnnouncements)
-    embed.set_footer(text='Remember to make it a great day, everybody!')
+    time = dt.date(day=today.day, month=today.month, year=today.year).strftime('%A %B %d, %Y')
+    embed.set_footer(text='Keep on a\'rocking Sprague! | ' + time)
     if dt.date.today().weekday() is 1 or 3:
         embed.set_thumbnail(url=emojiA)
     elif dt.date.today().weekday() is 2 or 4:
@@ -254,7 +257,7 @@ async def postAnnouncements():
     for announcement in announcements:
         if len(announcement) > 1024:
             announcement = announcement[:1021] + '...'
-            
+
         embed.add_field(name='⸻\t\t\t⸻\t\t\t⸻\t\t\t⸻\t\t\t⸻',
                         value=announcement)
 
