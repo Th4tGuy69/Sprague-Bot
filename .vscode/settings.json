@@ -1,5 +1,5 @@
 {
-    "python.pythonPath": "C:\\Users\\ThatG\\AppData\\Local\\Programs\\Python\\Python36-32\\python.exe",
+    "python.pythonPath": "C:\\Users\\webtech\\AppData\\Local\\Programs\\Python\\Python37-32\\python.exe",
     "python.jediEnabled": true,
     "sqltools.connections": [
         {
@@ -7,6 +7,11 @@
             "database": ".\\warned.db",
             "dialect": "SQLite",
             "name": "warned"
+        },
+        {
+            "database": "${workspaceFolder}\\warned.db",
+            "dialect": "SQLite",
+            "name": "Warned"
         }
     ],
     "sqltools.useNodeRuntime": true

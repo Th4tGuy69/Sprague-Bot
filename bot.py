@@ -36,6 +36,7 @@ dayType = ''
 
 #await openDB()
 
+#TODO: Include student id, grade, more?
 #sq.execute('''CREATE TABLE warned (first_last text, user_id integer, warnings integer, banned integer)''')
 '''
 values = [
@@ -64,18 +65,21 @@ async def closeDB():
     db.close()
 
 
-# Grab bot token and prefix from file, TODO: If we have any actual user commands, make the prefix changable
+# Grab bot token and prefix, sightengine, and tosc file location from json, TODO: If we have any actual user commands, make the prefix changable
 with open('info.json', 'r') as json_file:
     data = json.load(json_file)
     for j in data['info']:
-        token = j['token']
-        prefix = j['prefix']
+        token = j['botToken']
+        prefix = j['botPrefix']
+        SEUser = j['SEUser']
+        SESecret = j['SESecret']
+        ocrLocation = j['tesseractLocation']
     json_file.close()
 
 
 client = commands.Bot(command_prefix=prefix)
-sight = SightengineClient('1428354798', 'HbyKWBXNC2T96rYbaeGD')
-pytesseract.pytesseract.tesseract_cmd = r'C:/Program Files (x86)/Tesseract-OCR/tesseract.exe'
+sight = SightengineClient(SEUser, SESecret)
+pytesseract.pytesseract.tesseract_cmd = ocrLocation
 
 # https://digi.bib.uni-mannheim.de/tesseract/tesseract-ocr-w64-setup-v5.0.0-alpha.20190708.exe
 # https://stackoverflow.com/questions/50951955/pytesseract-tesseractnotfound-error-tesseract-is-not-installed-or-its-not-i
@@ -130,9 +134,7 @@ async def on_message(message):
                 img = Image.open(BytesIO(responce.content))
                 text = pytesseract.image_to_string(Image.open(BytesIO(requests.get(a.proxy_url).content))) #ughhhhh
                 prob = predict_prob([text])
-                print(text, ': ', prob, '%: ', a.proxy_url)
-
-                return 0
+                #print(text, ': ', prob, '%: ', a.proxy_url)
 
                 output = sight.check('nudity', 'wad', 'offensive',
                                      'text').set_url(a.proxy_url)
