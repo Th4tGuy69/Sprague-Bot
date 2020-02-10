@@ -34,9 +34,22 @@ announcements = []
 date = ''
 dayType = ''
 
-#await openDB()
+# URL Validation
+async def URL(str):
+    url = re.findall(
+        r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\), ]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', str)
+    return url
 
-#TODO: Include student id, grade, more?
+# await openDB()
+
+class Warning:
+    def __init__(self, o, c):
+        self.offences = o
+        self.causes = c
+
+
+# TODO: Include student id, grade, array of warnings, more?
+# TODO: Switch to a DB that supports storage of custom types
 #sq.execute('''CREATE TABLE warned (first_last text, user_id integer, warnings integer, banned integer)''')
 '''
 values = [
@@ -52,6 +65,7 @@ sq.executemany('INSERT INTO warned VALUES (?,?,?,?)', values)
 
 await closeDB()
 '''
+
 
 async def openDB():
     global db
@@ -84,12 +98,14 @@ pytesseract.pytesseract.tesseract_cmd = ocrLocation
 # https://digi.bib.uni-mannheim.de/tesseract/tesseract-ocr-w64-setup-v5.0.0-alpha.20190708.exe
 # https://stackoverflow.com/questions/50951955/pytesseract-tesseractnotfound-error-tesseract-is-not-installed-or-its-not-i
 
+
 @client.event
 async def on_ready():
     print('\nLogged in as: ', client.user.name)
     print('ID: ', client.user.id)
-    print('Using discord.py version: ', discord.__version__)
-    print('Running on python version: ', sys.version.split(' ')[0])
+    print('Using discord.py version: ', discord.__version__)  # using 1.3.1
+    print('Running on python version: ',
+          sys.version.split(' ')[0])  # using 3.7.0
     print('Ready to use\n')
 
 
@@ -124,63 +140,63 @@ async def on_member_join(member):
 async def on_message(message):
     if message.author == client.user:
         return
-    elif message.attachments != None:
-        for a in message.attachments:  # TODO: Doesn't detect image if sent by url
-            # a.read(use_cached=True))
-            #if a.url != None:
-                #NotImplemented
-            if True == True:
-                responce = requests.get(a.proxy_url)
-                img = Image.open(BytesIO(responce.content))
-                text = pytesseract.image_to_string(Image.open(BytesIO(requests.get(a.proxy_url).content))) #ughhhhh
-                prob = predict_prob([text])
-                #print(text, ': ', prob, '%: ', a.proxy_url)
+    else:
+        for url in await URL(message.content):
+            print('URL: ', url)
+        return
 
-                output = sight.check('nudity', 'wad', 'offensive',
-                                     'text').set_url(a.proxy_url)
-                if output['status'] == 'success':
-                    offenses = []
+        responce = requests.get(a.proxy_url)
+        img = Image.open(BytesIO(responce.content))
+        text = pytesseract.image_to_string(Image.open(
+            BytesIO(requests.get(a.proxy_url).content)))  # ughhhhh
+        prob = predict_prob([text])
 
-                    # check nudity
-                    if output['nudity']['raw'] > 0.35:
-                        offenses.append('RAW NUDITY')
-                    if output['nudity']['partial'] > 0.35:
-                        offenses.append('PARTIAL NUDITY')
-
-                    # check weapons, alcohol, & drugs
-                    if output['weapon'] > 0.4:
-                        offenses.append('WEAPON')
-                    if output['alcohol'] > 0.5:
-                        offenses.append('ALCOHOL')
-                    if output['drugs'] > 0.5:
-                        offenses.append('DRUGS')
-
-                    # check offensive
-                    if output['offensive']['prob'] > 0.5:
-                        offenses.append('OFFENSIVE')
-
-                    # check text
-                    '''if output['text']['has_artificial'] or output['text']['has_natural'] > 0.5:
-                        text = pytesseract.image_to_string(Image.open(BytesIO(requests.get(a.proxy_url).content)).convert("RGB"), lang='eng')
-                        prob = predict_prob([text])
-                        print(prob) #TODO: Check this against a list of 'bad words'''
-
-                    if len(offenses) > 0:
-                        await message.delete()
-                        await Warn(offenses, message, a.proxy_url)
-
-                    with open('test.json', 'w') as outfile:
-                        json.dump(output, outfile, indent=4)
-                    outfile.close()
-                else:
-                    NotImplemented  # TODO: Have admins manually review
+        for i in message.attachments:  # TODO: Doesn't detect image if sent by url
+            Sight(message, i.proxy_url)
 
 
-async def Warn(offences, message, img_url):
+async def Sight(message, url):
+    output = sight.check(
+        'nudity', 'wad', 'offensive').set_url(url)
+    if output['status'] == 'success':
+        offenses = []
+
+        # check nudity
+        if output['nudity']['raw'] > 0.35:
+            offenses.append('RAW NUDITY')
+        if output['nudity']['partial'] > 0.35:
+            offenses.append('PARTIAL NUDITY')
+
+        # check weapons, alcohol, & drugs
+        if output['weapon'] > 0.4:
+            offenses.append('WEAPON')
+        if output['alcohol'] > 0.5:
+            offenses.append('ALCOHOL')
+        if output['drugs'] > 0.5:
+            offenses.append('DRUGS')
+
+        # check offensive
+        if output['offensive']['prob'] > 0.5:
+            offenses.append('OFFENSIVE')
+
+        if len(offenses) > 0:
+            await message.delete()
+            await Warn(offenses, message.author, url)
+
+        with open('test.json', 'w') as outfile:
+            json.dump(output, outfile, indent=4)
+        outfile.close()
+
+        return(0)
+    else:
+        return(1)
+
+
+async def Warn(offences, author, img_url):
     # add to user's warnings, if > 3 then ban
     await openDB()
     sq.execute('SELECT warnings FROM warned WHERE user_id=?',
-               (message.author.id,))
+               (author.id,))
     temp = sq.fetchone()
     warnings = temp[0] + 1
     banned = False
@@ -204,11 +220,11 @@ async def Warn(offences, message, img_url):
     embed.set_image(url=img_url)
     embed.set_footer(text='Remember to make it a great day!')
 
-    # TODO: Send to list of admins as documentation
-    await message.author.send(embed=embed)
+    # TODO: Send to admins to confirm warnings
+    await author.send(embed=embed)
 
     sq.execute('UPDATE warned SET warnings = ?, banned = ? WHERE user_id=?',
-               (warnings, banned, message.author.id,))
+               (warnings, banned, author.id,))
 
     await closeDB()
 
@@ -248,7 +264,8 @@ async def postAnnouncements():
         '0', ''), date[2], date[0][2:], dayType), type='rich', url='http://spragueannouncements.blogspot.com/', color=0xf04923)
     embed.set_author(name='Sprague Bot', url='https://github.com/Th4tGuy69/Sprague-Bot',
                      icon_url=emojiAnnouncements)
-    time = dt.date(day=today.day, month=today.month, year=today.year).strftime('%A %B %d, %Y')
+    time = dt.date(day=today.day, month=today.month,
+                   year=today.year).strftime('%A %B %d, %Y')
     embed.set_footer(text='Keep on a\'rocking Sprague! | ' + time)
     if dt.date.today().weekday() is 1 or 3:
         embed.set_thumbnail(url=emojiA)
