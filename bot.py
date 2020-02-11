@@ -9,15 +9,18 @@
 import re
 import sys
 import json
-import sqlite3
 import discord
 import requests
+import psycopg2
+import sqlalchemy
 import pytesseract
 import datetime as dt
 from PIL import Image
 from io import BytesIO
 from bs4 import BeautifulSoup
 from discord.ext import commands
+from sqlalchemy.dialects import postgresql
+from sqlalchemy import Table, Column, MetaData
 from sightengine.client import SightengineClient
 from profanity_check import predict, predict_prob
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -34,49 +37,51 @@ announcements = []
 date = ''
 dayType = ''
 
+
 # URL Validation
 async def URL(str):
     url = re.findall(
         r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\), ]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', str)
     return url
 
-# await openDB()
 
-class Warning:
-    def __init__(self, o, c):
-        self.offences = o
-        self.causes = c
+class Warning(sqlalchemy.types.UserDefinedType):
+    def __init__(self, o = 0, c = [], p=8):
+        self.offences, self.causes, self.precision = o, c, p
+
+    def get_col_spec(self, **kw):
+        return "Warning(%s)" % self.precision
+
+    def bind_processor(self, dialect):
+        def process(value):
+            return value
+        return process
+
+    def result_processor(self, dialect, coltype):
+        def process(value):
+            return value
+        return process
+
+
 
 
 # TODO: Include student id, grade, array of warnings, more?
 # TODO: Switch to a DB that supports storage of custom types
-#sq.execute('''CREATE TABLE warned (first_last text, user_id integer, warnings integer, banned integer)''')
-'''
-values = [
-    ('Caden Garrett', 147926148616159233, 0, False),
-    ('Jordan Millett', 271357265913577475, 0, False),
-    ('Ethan Hardey', 215663731672088576, 0, False),
-    ('Joseph Byers', 242482798986788864, 0, False),
-    ('Kyle Rudisil', 193065926206160896, 0, False)
-    ]
+# https://www.compose.com/articles/using-postgresql-through-sqlalchemy/
+engine = sqlalchemy.create_engine('postgresql+psycopg2://spraguebot:webbie64@localhost/warned')
+metadata = MetaData(engine)
+warned = Table('warned', metadata,
+    Column('first_last', sqlalchemy.types.String, primary_key=True),
+    #Column('student_id', sqlalchemy.types.SmallInteger, primary_key=True),
+    #Column('grade', sqlalchemy.types.SmallInteger),
+    Column('warnings', postgresql.ARRAY(Warning())),
+    Column('banned', sqlalchemy.types.Boolean),
+)
 
-sq.executemany('INSERT INTO warned VALUES (?,?,?,?)', values)
-#sq.execute('SELECT * FROM warned WHERE symbol=?', '')
+with engine.connect() as conn:
+    warned.create()
 
-await closeDB()
-'''
-
-
-async def openDB():
-    global db
-    global sq
-    db = sqlite3.connect('warned.db')
-    sq = db.cursor()
-
-
-async def closeDB():
-    db.commit()
-    db.close()
+    conn.close()
 
 
 # Grab bot token and prefix, sightengine, and tosc file location from json, TODO: If we have any actual user commands, make the prefix changable
@@ -101,11 +106,11 @@ pytesseract.pytesseract.tesseract_cmd = ocrLocation
 
 @client.event
 async def on_ready():
-    print('\nLogged in as: ', client.user.name)
-    print('ID: ', client.user.id)
-    print('Using discord.py version: ', discord.__version__)  # using 1.3.1
-    print('Running on python version: ',
-          sys.version.split(' ')[0])  # using 3.7.0
+    print('\nLogged in as:', client.user.name)
+    print('ID:', client.user.id)
+    print('Discord.py version:', discord.__version__)  # using 1.3.1
+    print('Python version:', sys.version.split(' ')[0])  # using 3.7.0
+    print('SQLAlchemy version:', sqlalchemy.__version__)  # using 1.3.13
     print('Ready to use\n')
 
 
