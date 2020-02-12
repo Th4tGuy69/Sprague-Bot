@@ -19,6 +19,7 @@ from PIL import Image
 from io import BytesIO
 from bs4 import BeautifulSoup
 from discord.ext import commands
+from sqlalchemy_utils import Composite
 from sqlalchemy.dialects import postgresql
 from sqlalchemy import Table, Column, MetaData
 from sightengine.client import SightengineClient
@@ -44,10 +45,10 @@ async def URL(str):
         r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\), ]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', str)
     return url
 
-
-class Warning(sqlalchemy.types.UserDefinedType):
-    def __init__(self, o = 0, c = [], p=8):
-        self.offences, self.causes, self.precision = o, c, p
+# include if manually overrided?
+class Warning(sqlalchemy.types.UserDefinedType): 
+    def __init__(self, o = [], c = '', p=8):
+        self.offences, self.cause, self.precision = o, c, p
 
     def get_col_spec(self, **kw):
         return "Warning(%s)" % self.precision
@@ -65,17 +66,29 @@ class Warning(sqlalchemy.types.UserDefinedType):
 
 
 
+
+
+
+
 # TODO: Include student id, grade, array of warnings, more?
 # TODO: Switch to a DB that supports storage of custom types
 # https://www.compose.com/articles/using-postgresql-through-sqlalchemy/
-engine = sqlalchemy.create_engine('postgresql+psycopg2://spraguebot:webbie64@localhost/warned')
+# https://stackoverflow.com/questions/9521020/sqlalchemy-array-of-postgresql-custom-types
+engine = sqlalchemy.create_engine('postgresql+psycopg2://postgres:webbie64@localhost:5432/')
 metadata = MetaData(engine)
 warned = Table('warned', metadata,
     Column('first_last', sqlalchemy.types.String, primary_key=True),
     #Column('student_id', sqlalchemy.types.SmallInteger, primary_key=True),
     #Column('grade', sqlalchemy.types.SmallInteger),
-    Column('warnings', postgresql.ARRAY(Warning())),
-    Column('banned', sqlalchemy.types.Boolean),
+    Column('discord_id', sqlalchemy.types.Integer),
+    Column(CompositeType(
+        'warnings',
+        [
+            Column('offenses', ),
+            Column('causes', )
+        ]
+    )),
+    Column('banned', sqlalchemy.types.Boolean)
 )
 
 with engine.connect() as conn:
