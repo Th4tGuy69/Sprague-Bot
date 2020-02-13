@@ -9,17 +9,19 @@
 import re
 import sys
 import json
+import furl
 import discord
 import requests
 import psycopg2
 import sqlalchemy
+import sqlalchemy_utils
 import pytesseract
 import datetime as dt
 from PIL import Image
 from io import BytesIO
 from bs4 import BeautifulSoup
 from discord.ext import commands
-from sqlalchemy_utils import Composite
+from sqlalchemy_utils import CompositeType
 from sqlalchemy.dialects import postgresql
 from sqlalchemy import Table, Column, MetaData
 from sightengine.client import SightengineClient
@@ -64,7 +66,20 @@ class Warning(sqlalchemy.types.UserDefinedType):
         return process
 
 
-
+class Warned():
+    __tablename__ = 'warned'
+    name = Column('first_last', sqlalchemy.types.String, primary_key=True)
+    # stud_id = Column('student_id', sqlalchemy.types.SmallInteger, primary_key=True)
+    # grade = Column('grade', sqlalchemy.types.SmallInteger)
+    disc_id = Column('discord_id', sqlalchemy.types.Integer)
+    banned = Column('banned', sqlalchemy.types.Boolean)
+    warnings = Column(
+        CompositeType(
+            'warnings',
+            [
+                Column('cause', sqlalchemy_utils.types.url.URLType)
+            ]
+    ))
 
 
 
@@ -74,26 +89,28 @@ class Warning(sqlalchemy.types.UserDefinedType):
 # TODO: Switch to a DB that supports storage of custom types
 # https://www.compose.com/articles/using-postgresql-through-sqlalchemy/
 # https://stackoverflow.com/questions/9521020/sqlalchemy-array-of-postgresql-custom-types
-engine = sqlalchemy.create_engine('postgresql+psycopg2://postgres:webbie64@localhost:5432/')
+engine = sqlalchemy.create_engine('postgresql+psycopg2://tech:webbie64@localhost:5432/warned')
+#sqlalchemy_utils.functions.create_database(engine.url)
 metadata = MetaData(engine)
+
 warned = Table('warned', metadata,
     Column('first_last', sqlalchemy.types.String, primary_key=True),
     #Column('student_id', sqlalchemy.types.SmallInteger, primary_key=True),
     #Column('grade', sqlalchemy.types.SmallInteger),
     Column('discord_id', sqlalchemy.types.Integer),
+    Column('banned', sqlalchemy.types.Boolean),
     Column(CompositeType(
         'warnings',
         [
-            Column('offenses', ),
-            Column('causes', )
+            Column('cause', sqlalchemy.types.String),
         ]
-    )),
-    Column('banned', sqlalchemy.types.Boolean)
+    ))
 )
+metadata.create_all(engine)
 
 with engine.connect() as conn:
-    warned.create()
 
+    conn.execute('commit')
     conn.close()
 
 
