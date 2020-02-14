@@ -89,8 +89,10 @@ class Warned():
 # TODO: Switch to a DB that supports storage of custom types
 # https://www.compose.com/articles/using-postgresql-through-sqlalchemy/
 # https://stackoverflow.com/questions/9521020/sqlalchemy-array-of-postgresql-custom-types
-engine = sqlalchemy.create_engine('postgresql+psycopg2://tech:webbie64@localhost:5432/warned')
-#sqlalchemy_utils.functions.create_database(engine.url)
+engine = sqlalchemy.create_engine('postgresql://tech:webbie64@localhost:5432/C:/Users/webtech/Documents/GitHub/Sprague-Bot/warned.db')
+'''
+sqlalchemy_utils.functions.drop_database(engine.url)
+sqlalchemy_utils.functions.create_database(engine.url)
 metadata = MetaData(engine)
 
 warned = Table('warned', metadata,
@@ -99,19 +101,26 @@ warned = Table('warned', metadata,
     #Column('grade', sqlalchemy.types.SmallInteger),
     Column('discord_id', sqlalchemy.types.Integer),
     Column('banned', sqlalchemy.types.Boolean),
-    Column(CompositeType(
-        'warnings',
+    Column('warnings', sqlalchemy.types.ARRAY(CompositeType(
+        'warning',
         [
-            Column('cause', sqlalchemy.types.String),
+            Column('cause', sqlalchemy_utils.types.url.URLType),
+            Column('offenses', sqlalchemy.types.ARRAY(sqlalchemy.String))
         ]
-    ))
+    )))
 )
 metadata.create_all(engine)
+'''
 
-with engine.connect() as conn:
 
-    conn.execute('commit')
-    conn.close()
+async def openDB():
+    global sq
+    sq = engine.connect()
+
+
+async def closeDB():
+    sq.execute('commit')
+    sq.close()
 
 
 # Grab bot token and prefix, sightengine, and tosc file location from json, TODO: If we have any actual user commands, make the prefix changable
