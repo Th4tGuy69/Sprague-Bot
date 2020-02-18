@@ -23,7 +23,7 @@ from bs4 import BeautifulSoup
 from discord.ext import commands
 from sqlalchemy_utils import CompositeType
 from sqlalchemy.dialects import postgresql
-from sqlalchemy import Table, Column, MetaData
+from sqlalchemy import *
 from sightengine.client import SightengineClient
 from profanity_check import predict, predict_prob
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -49,8 +49,11 @@ async def URL(str):
 
 # include if manually overrided?
 class Warning(sqlalchemy.types.UserDefinedType): 
-    def __init__(self, o = [], c = '', p=8):
-        self.offences, self.cause, self.precision = o, c, p
+    def __init__(self, c = '', o = [], p=8):
+        self.cause, self.offences, self.precision = o, c, p
+
+    def __getitem__(self, index):
+        return self
 
     def get_col_spec(self, **kw):
         return "Warning(%s)" % self.precision
@@ -66,22 +69,6 @@ class Warning(sqlalchemy.types.UserDefinedType):
         return process
 
 
-class Warned():
-    __tablename__ = 'warned'
-    name = Column('first_last', sqlalchemy.types.String, primary_key=True)
-    # stud_id = Column('student_id', sqlalchemy.types.SmallInteger, primary_key=True)
-    # grade = Column('grade', sqlalchemy.types.SmallInteger)
-    disc_id = Column('discord_id', sqlalchemy.types.Integer)
-    banned = Column('banned', sqlalchemy.types.Boolean)
-    warnings = Column(
-        CompositeType(
-            'warnings',
-            [
-                Column('cause', sqlalchemy_utils.types.url.URLType)
-            ]
-    ))
-
-
 
 
 
@@ -90,16 +77,16 @@ class Warned():
 # https://www.compose.com/articles/using-postgresql-through-sqlalchemy/
 # https://stackoverflow.com/questions/9521020/sqlalchemy-array-of-postgresql-custom-types
 engine = sqlalchemy.create_engine('postgresql://tech:webbie64@localhost:5432/C:/Users/webtech/Documents/GitHub/Sprague-Bot/warned.db')
-'''
-sqlalchemy_utils.functions.drop_database(engine.url)
-sqlalchemy_utils.functions.create_database(engine.url)
-metadata = MetaData(engine)
 
+#sqlalchemy_utils.functions.drop_database(engine.url)
+#sqlalchemy_utils.functions.create_database(engine.url)
+
+metadata = MetaData(engine)
 warned = Table('warned', metadata,
     Column('first_last', sqlalchemy.types.String, primary_key=True),
     #Column('student_id', sqlalchemy.types.SmallInteger, primary_key=True),
     #Column('grade', sqlalchemy.types.SmallInteger),
-    Column('discord_id', sqlalchemy.types.Integer),
+    Column('discord_id', sqlalchemy.types.String),
     Column('banned', sqlalchemy.types.Boolean),
     Column('warnings', sqlalchemy.types.ARRAY(CompositeType(
         'warning',
@@ -109,9 +96,7 @@ warned = Table('warned', metadata,
         ]
     )))
 )
-metadata.create_all(engine)
-'''
-
+#metadata.create_all(engine)
 
 async def openDB():
     global sq
@@ -121,6 +106,22 @@ async def openDB():
 async def closeDB():
     sq.execute('commit')
     sq.close()
+
+
+sq = engine.connect()
+#sq.execute("INSERT INTO warned (first_last, discord_id, banned) VALUES ('Caden Garrett', '147926148616159233', False)")
+
+#sq.execute('UPDATE warned SET warnings = ? WHERE first_last = ?', ([('URL', [('A', 'B')])], 'Caden Garrett'))
+u = text('UPDATE warned SET warnings = :q WHERE first_last = :name')
+sq.execute(u, q=Warning('https://tinyurl.com/', ['A', 'B']), name='Caden_Garrett')
+
+
+
+
+
+result = sq.execute('SELECT * FROM warned')
+for r in result:
+    print(r)
 
 
 # Grab bot token and prefix, sightengine, and tosc file location from json, TODO: If we have any actual user commands, make the prefix changable
