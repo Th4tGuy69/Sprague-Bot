@@ -91,7 +91,7 @@ warned = Table('warned', metadata,
     Column('warnings', sqlalchemy.types.ARRAY(CompositeType(
         'warning',
         [
-            Column('cause', sqlalchemy_utils.types.url.URLType),
+            Column('cause', sqlalchemy.types.String),
             Column('offenses', sqlalchemy.types.ARRAY(sqlalchemy.String))
         ]
     )))
@@ -111,18 +111,27 @@ async def closeDB():
 sq = engine.connect()
 #sq.execute("INSERT INTO warned (first_last, discord_id, banned) VALUES ('Caden Garrett', '147926148616159233', False)")
 
-#sq.execute('UPDATE warned SET warnings = ? WHERE first_last = ?', ([('URL', [('A', 'B')])], 'Caden Garrett'))
-u = text('UPDATE warned SET warnings = :q WHERE first_last = :name')
-sq.execute(u, q=Warning('https://tinyurl.com/', ['A', 'B']), name='Caden_Garrett')
+u = text('UPDATE warned SET warnings[:i] = :w WHERE first_last = :name')
+sq.execute(u, i=0, w=('https://www.google.com/', ['A', 'B']), name='Caden Garrett')
+sq.execute(u, i=1, w=('https://www.discord.gg/', ['A', 'B']), name='Caden Garrett')
+
+s = text('SELECT warnings[:i] FROM warned WHERE first_last = :name')
+result = sq.execute(s, i=1, w=('https://www.discord.gg/', ['A', 'B']), name='Caden Garrett')
 
 
 
 
 
-result = sq.execute('SELECT * FROM warned')
+
+
+
+#result = sq.execute('SELECT * FROM warned')
 for r in result:
     print(r)
 
+closeDB()
+sq.execute('commit')
+sq.close()
 
 # Grab bot token and prefix, sightengine, and tosc file location from json, TODO: If we have any actual user commands, make the prefix changable
 with open('info.json', 'r') as json_file:
