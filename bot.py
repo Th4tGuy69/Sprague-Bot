@@ -7,6 +7,7 @@
 
 # region Imports
 import re
+import ast
 import sys
 import json
 import furl
@@ -47,56 +48,40 @@ async def URL(str):
         r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\), ]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', str)
     return url
 
-# include if manually overrided?
-class Warning(sqlalchemy.types.UserDefinedType): 
-    def __init__(self, c = '', o = [], p=8):
-        self.cause, self.offences, self.precision = o, c, p
 
-    def __getitem__(self, index):
-        return self
-
-    def get_col_spec(self, **kw):
-        return "Warning(%s)" % self.precision
-
-    def bind_processor(self, dialect):
-        def process(value):
-            return value
-        return process
-
-    def result_processor(self, dialect, coltype):
-        def process(value):
-            return value
-        return process
-
-
-
+class Warning():
+    def __init__(self, c, o):
+        self.cause, self.offences = c, o
 
 
 # TODO: Include student id, grade, array of warnings, more?
 # TODO: Switch to a DB that supports storage of custom types
 # https://www.compose.com/articles/using-postgresql-through-sqlalchemy/
 # https://stackoverflow.com/questions/9521020/sqlalchemy-array-of-postgresql-custom-types
-engine = sqlalchemy.create_engine('postgresql://tech:webbie64@localhost:5432/C:/Users/webtech/Documents/GitHub/Sprague-Bot/warned.db')
+engine = sqlalchemy.create_engine(
+    'postgresql://tech:webbie64@localhost:5432/C:/Users/webtech/Documents/GitHub/Sprague-Bot/warned.db')
 
-#sqlalchemy_utils.functions.drop_database(engine.url)
-#sqlalchemy_utils.functions.create_database(engine.url)
+# sqlalchemy_utils.functions.drop_database(engine.url)
+# sqlalchemy_utils.functions.create_database(engine.url)
 
 metadata = MetaData(engine)
 warned = Table('warned', metadata,
-    Column('first_last', sqlalchemy.types.String, primary_key=True),
-    #Column('student_id', sqlalchemy.types.SmallInteger, primary_key=True),
-    #Column('grade', sqlalchemy.types.SmallInteger),
-    Column('discord_id', sqlalchemy.types.String),
-    Column('banned', sqlalchemy.types.Boolean),
-    Column('warnings', sqlalchemy.types.ARRAY(CompositeType(
-        'warning',
-        [
-            Column('cause', sqlalchemy.types.String),
-            Column('offenses', sqlalchemy.types.ARRAY(sqlalchemy.String))
-        ]
-    )))
-)
-#metadata.create_all(engine)
+               Column('first_last', sqlalchemy.types.String, primary_key=True),
+               #Column('student_id', sqlalchemy.types.SmallInteger, primary_key=True),
+               #Column('grade', sqlalchemy.types.SmallInteger),
+               Column('discord_id', sqlalchemy.types.String),
+               Column('banned', sqlalchemy.types.Boolean),
+               Column('warnings', sqlalchemy.types.ARRAY(CompositeType(
+                   'warning',  # Include if manually overrided?
+                   [
+                       Column('cause', sqlalchemy.types.String),
+                       Column('offenses', sqlalchemy.types.ARRAY(
+                           sqlalchemy.String))
+                   ]
+               )))
+               )
+# metadata.create_all(engine)
+
 
 async def openDB():
     global sq
@@ -107,31 +92,36 @@ async def closeDB():
     sq.execute('commit')
     sq.close()
 
-
-sq = engine.connect()
-#sq.execute("INSERT INTO warned (first_last, discord_id, banned) VALUES ('Caden Garrett', '147926148616159233', False)")
-
-u = text('UPDATE warned SET warnings[:i] = :w WHERE first_last = :name')
-sq.execute(u, i=0, w=('https://www.google.com/', ['A', 'B']), name='Caden Garrett')
-sq.execute(u, i=1, w=('https://www.discord.gg/', ['A', 'B']), name='Caden Garrett')
-
-s = text('SELECT warnings[:i] FROM warned WHERE first_last = :name')
-result = sq.execute(s, i=1, w=('https://www.discord.gg/', ['A', 'B']), name='Caden Garrett')
+# TODO: support for searaching for ids?
 
 
+async def getWarnings(name):
+    s = text('SELECT warnings[:i] FROM warned WHERE first_last = :name')
+    warnings = []
+    await openDB()
+    for x in range(3):
+        try:
+            result = sq.execute(s, i=x, name='Caden Garrett')
+            temp = result.first()[0].split(',', 1)
+            cause = temp[0][1:]
+            offences = temp[1][2:-3].replace('\"', '').split(',')
+            warnings.append(Warning(cause, offences))
+        except:
+            NotImplemented
+
+    await closeDB()
+    return warnings
+
+# TODO: Test
 
 
-
-
-
-
-#result = sq.execute('SELECT * FROM warned')
-for r in result:
-    print(r)
-
-closeDB()
-sq.execute('commit')
-sq.close()
+async def giveWarning(name, warning):
+    # TODO: Make this append
+    u = text('UPDATE warned SET warnings || :w WHERE first_last = :name')
+    await openDB()
+    sq.execute(u, w=(warning.cause,
+                     warning.offences), name=name)
+    await closeDB()
 
 # Grab bot token and prefix, sightengine, and tosc file location from json, TODO: If we have any actual user commands, make the prefix changable
 with open('info.json', 'r') as json_file:
