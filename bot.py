@@ -50,7 +50,7 @@ async def URL(str):
 
 
 class Warning():
-    def __init__(self, c, o):
+    def __init__(self, c=None, o=None):
         self.cause, self.offences = c, o
 
 
@@ -112,16 +112,20 @@ async def getWarnings(name):
     await closeDB()
     return warnings
 
-# TODO: Test
 
-
-async def giveWarning(name, warning):
-    # TODO: Make this append
-    u = text('UPDATE warned SET warnings || :w WHERE first_last = :name')
+async def giveWarning(name, cause, offences):
+    u = text('UPDATE warned SET warnings = array_append(warnings, (:c, :o)::warning) WHERE first_last = :name')
     await openDB()
-    sq.execute(u, w=(warning.cause,
-                     warning.offences), name=name)
+    sq.execute(u, c=cause, o=offences, name=name)
     await closeDB()
+
+
+async def removeWarning(name, cause, offences):
+    u = text('UPDATE warned SET warnings = array_remove(warnings, (:c, :o)::warning) WHERE first_last = :name')
+    await openDB()
+    sq.execute(u, c=cause, o=offences, name=name)
+    await closeDB()
+
 
 # Grab bot token and prefix, sightengine, and tosc file location from json, TODO: If we have any actual user commands, make the prefix changable
 with open('info.json', 'r') as json_file:
@@ -133,6 +137,8 @@ with open('info.json', 'r') as json_file:
         SESecret = j['SESecret']
         ocrLocation = j['tesseractLocation']
     json_file.close()
+
+
 
 
 client = commands.Bot(command_prefix=prefix)
@@ -156,7 +162,8 @@ async def on_ready():
 # Sends new users a message on joining the guild
 # TODO: Test
 # TODO: Check username for profanity
-# TODO: Add new users to SQLite Database
+# TODO: Check pfp with sight engine and require change
+# TODO: Add new users to Database
 @client.event
 async def on_member_join(member):
     '''
@@ -184,7 +191,9 @@ async def on_member_join(member):
 async def on_message(message):
     if message.author == client.user:
         return
-    else:
+    elif message.content[0] == prefix:
+        NotImplemented
+    else: #probably shouldn't be an else
         for url in await URL(message.content):
             print('URL: ', url)
         return
