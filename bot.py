@@ -191,8 +191,50 @@ async def on_member_join(member):
 async def on_message(message):
     if message.author == client.user:
         return
-    elif message.content[0] == prefix:
-        NotImplemented
+    elif message.content.startswith(prefix):
+        if 'test' in message.content:
+            url = 'https://cdn.discordapp.com/attachments/620167820558204928/675434297775357962/n4VQ3hbwOkofbjhdiqEj_PWILJQ9ssqsCDRuOguC-AufrmYgdaamPE8kxotb52EzoT3ZkkItcvfMIaWzZlpT_yqof2OBocKMu6Dk.png'
+            embed = discord.Embed(color=0xf04923)
+            embed.set_author(name='Please Verify:')
+            embed.set_image(url=url)
+            embed.add_field(name='Cause:', value='[Link](%s)' % url, inline=True)
+            x = ['Gun', 'Racist']
+            embed.add_field(name='Offenses:', value=', '.join(x), inline=True)
+
+            sentMessage = await message.channel.send(embed=embed)
+
+            await sentMessage.add_reaction(emoji='✅')
+            await sentMessage.add_reaction(emoji='❌')
+            '''
+            def check(reaction):
+                return str(reaction.emoji)
+
+            try:
+                reaction = await client.wait_for('reaction_add', check=check)
+            except:
+                NotImplemented
+            else:
+                print(reaction)
+                if reaction == ':white_check_mark:':
+                    await message.channel.send('Check')
+                elif reaction == ':x:':
+                    await message.channel.send('X')'''
+
+            def check(reaction, user):
+                return user == message.author and str(reaction.emoji) == '✅' or '❌'
+
+            try:
+                reaction, user = await client.wait_for('reaction_add', timeout=99999, check=check)
+            except:
+                await message.channel.send('Error')
+            else:
+                # TODO: change (user == message.author) to check against list of admins/mods/whatever and send to admin chat in server
+                if (user == message.author) and (reaction == '✅' or '❌'):
+                    await message.channel.send(reaction)
+
+
+
+
     else: #probably shouldn't be an else
         for url in await URL(message.content):
             print('URL: ', url)
@@ -273,7 +315,7 @@ async def Warn(offences, author, img_url):
     embed.set_image(url=img_url)
     embed.set_footer(text='Remember to make it a great day!')
 
-    # TODO: Send to admins to confirm warnings
+    # TODO: Send to an admin chat to confirm warnings
     await author.send(embed=embed)
 
     sq.execute('UPDATE warned SET warnings = ?, banned = ? WHERE user_id=?',
