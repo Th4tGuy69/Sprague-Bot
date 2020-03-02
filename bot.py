@@ -62,8 +62,8 @@ engine = sqlalchemy.create_engine(
     'postgresql://tech:webbie64@localhost:5432/spragueBot.db')
 metadata = MetaData(engine)
 
-#sqlalchemy_utils.functions.drop_database(engine.url)
-#sqlalchemy_utils.functions.create_database(engine.url)
+sqlalchemy_utils.functions.drop_database(engine.url)
+sqlalchemy_utils.functions.create_database(engine.url)
 
 metadata = MetaData(engine)
 warned = Table('warned', metadata,
@@ -90,6 +90,7 @@ staff = Table('staff', metadata,
                )
 verification = Table('verification', metadata,# TODO: MAKE THIS TABLE *****************************
                Column('message_id', sqlalchemy.types.String, primary_key=True),
+               Column('channel_id', sqlalchemy.types.String),
                #Column('student_id', sqlalchemy.types.SmallInteger, primary_key=True),
                #Column('grade', sqlalchemy.types.SmallInteger),
                Column('confirmed_by', sqlalchemy.types.String),
@@ -110,13 +111,13 @@ async def closeDB():
 # TODO: support for searaching for ids?
 
 #region Warning Functions
-async def getWarnings(name):
-    s = text('SELECT warnings[:i] FROM warned WHERE first_last = :name')
+async def getWarnings(indexer, value):
+    s = text('SELECT warnings[:i] FROM warned WHERE :ind = :v')
     warnings = []
     await openDB()
     for x in range(3):
         try:
-            result = sq.execute(s, i=x, name=name)
+            result = sq.execute(s, i=x, ind=indexer, v=value)
             temp = result.first()[0].split(',', 1)
             cause = temp[0][1:]
             offences = temp[1][2:-3].replace('\"', '').split(',')
@@ -164,20 +165,47 @@ async def removeStaff(indexer, value): # TODO: Send message to user
 #endregion
 
 #region Verification Functions
-async def addReport(msg_id):
-    i = text('INSERT IGNORE INTO verification (message_id) VALUES (:id)')
+async def addReport(message):
+    id = message.content.split(' ')[1]
+    msg = message.channel.fetch_message(id)
+
+    i = text('INSERT IGNORE INTO verification (message_id, channel_id) VALUES (:msg, :cha)')
     await openDB()
-    sq.execute(i, id=msg_id)
+    sq.execute(i, msg=msg.id, cha=msg.channel.id)
     await closeDB()
-    await sendVerificationUpdate()
+    await sendVerificationUpdate(msg)
 
 #endregion
 
 
 
 
-async def sendVerificationUpdate(): #Send verification embed to 682637318569721898 
-    NotImplemented
+async def sendVerificationUpdate(message): #Send verification embed to 682637318569721898 
+    embed = discord.Embed(title='Please Verify:', description='Case **#%s**' % message.id, color=0xf04923)
+    if len(message.attachments) > 1:
+        def check(author):
+            def inner_check(message):
+                return message.author == author and 0 < int(message.content) <= len(message.attachments)
+            return inner_check
+        
+        await message.channel.send('Which attachment? (Decending 1-%i)' % len(message.attachments), delete_after=30)
+        try:
+            result = await client.wait_for('message', check=check(message.author), timeout=30)
+        except:
+            await message.channel.send('Error', delete_after=30)
+        else:
+            sight = await Sight(message, message.attachments[result - 1].proxy_url)
+            embed.set_image(url=message.attachments[result - 1].proxy_url)
+            embed.add_field(name='Offenses:', value=', '.join(sight), inline=True)
+    else:
+        sight = await Sight(message, message.attachments[0].proxy_url)
+        embed.set_image(url=message.attachments[0].proxy_url)
+        embed.add_field(name='Cause:', value='[Link](%s)' % message.attachments[0].proxy_url, inline=True)
+        embed.add_field(name='Offenses:', value=', '.join(sight), inline=True)
+
+    embed.set_footer(text='✅ to Confirm  |  ❌ to Deny')
+
+    await client.get_channel(682637318569721898).send(embed=embed)
 
 
 
@@ -274,7 +302,7 @@ async def on_message(message):
                     await message.channel.send(reaction)
 
         elif 'report' in message.content:
-            msg_id = message.content.split(' ')[1]
+            await addReport(message)
 
         elif 'verify ' in message.content:
             caseNum = message.content.replace('#', '').split(' ')[1]
@@ -286,10 +314,10 @@ async def on_message(message):
                     await message.channel.send(content='Case #%s not found!' % caseNum)
 
             else:
-                await message.channel.send(content='Case # cannot be blank!')
+                await message.channel.send(content='Case number cannot be blank!')
             
         elif 'admin' in message.content:
-            #await addStaff('Caden Garrett', '147926148616159233', 'admin')
+            #await addStaff('Caden Garrett', '147926148616159233', 'master')
             NotImplemented
 
 
@@ -309,7 +337,7 @@ async def on_message(message):
         for i in message.attachments:  # TODO: Doesn't detect image if sent by url
             Sight(message, i.proxy_url)
 
-
+# TODO: Train these variables? Make them modifyable in json?
 async def Sight(message, url):
     output = sight.check(
         'nudity', 'wad', 'offensive').set_url(url)
