@@ -82,21 +82,22 @@ warned = Table('warned', metadata,
                )))
                )
 staff = Table('staff', metadata,
-               Column('first_last', sqlalchemy.types.String, primary_key=True),
-               #Column('student_id', sqlalchemy.types.SmallInteger, primary_key=True),
-               #Column('grade', sqlalchemy.types.SmallInteger),
-               Column('discord_id', sqlalchemy.types.String),
-               Column('role', sqlalchemy.types.String)
-               )
-verification = Table('verification', metadata,# TODO: MAKE THIS TABLE *****************************
-               Column('message_id', sqlalchemy.types.String, primary_key=True),
-               Column('channel_id', sqlalchemy.types.String),
-               #Column('student_id', sqlalchemy.types.SmallInteger, primary_key=True),
-               #Column('grade', sqlalchemy.types.SmallInteger),
-               Column('confirmed_by', sqlalchemy.types.String),
-               Column('denied_by', sqlalchemy.types.String)
-               )
-#metadata.create_all(engine)
+              Column('first_last', sqlalchemy.types.String, primary_key=True),
+              #Column('student_id', sqlalchemy.types.SmallInteger, primary_key=True),
+              #Column('grade', sqlalchemy.types.SmallInteger),
+              Column('discord_id', sqlalchemy.types.String),
+              Column('role', sqlalchemy.types.String)
+              )
+verification = Table('verification', metadata,
+                     Column('message_id', sqlalchemy.types.String,
+                            primary_key=True),
+                     Column('channel_id', sqlalchemy.types.String),
+                     #Column('student_id', sqlalchemy.types.SmallInteger, primary_key=True),
+                     #Column('grade', sqlalchemy.types.SmallInteger),
+                     Column('confirmed_by', sqlalchemy.types.String),
+                     Column('denied_by', sqlalchemy.types.String)
+                     )
+# metadata.create_all(engine)
 
 
 async def openDB():
@@ -110,7 +111,9 @@ async def closeDB():
 
 # TODO: support for searaching for ids?
 
-#region Warning Functions
+# region Warning Functions
+
+
 async def getWarnings(indexer, value):
     s = text('SELECT warnings[:i] FROM warned WHERE :ind = :v')
     warnings = []
@@ -129,21 +132,33 @@ async def getWarnings(indexer, value):
     return warnings
 
 
-async def giveWarning(indexer, value, cause, offences): # TODO: Send message to user 
-    u = text('UPDATE warned SET warnings = array_append(warnings, (:c, :o)::warning) WHERE :i = :v')
+async def warningCount(indexer, value):
+    s = text('SELECT warned, ARRAY_LENGTH(warnings) WHERE :i = :v')
+    await openDB()
+    count = sq.execute(s, i=indexer, v=value)
+    await closeDB()
+    return int(count)
+
+
+async def giveWarning(indexer, value, cause, offences):  # TODO: Send message to user
+    u = text(
+        'UPDATE warned SET warnings = array_append(warnings, (:c, :o)::warning) WHERE :i = :v')
     await openDB()
     sq.execute(u, c=cause, o=offences, i=indexer, v=value)
     await closeDB()
 
 
-async def removeWarning(indexer, value, cause, offences): # TODO: Send message to user 
-    u = text('UPDATE warned SET warnings = array_remove(warnings, (:c, :o)::warning) WHERE :i = :v')
+async def removeWarning(indexer, value, cause, offences):  # TODO: Send message to user
+    u = text(
+        'UPDATE warned SET warnings = array_remove(warnings, (:c, :o)::warning) WHERE :i = :v')
     await openDB()
     sq.execute(u, c=cause, o=offences, i=indexer, v=value)
     await closeDB()
-#endregion
+# endregion
 
-#region Staff Functions
+# region Staff Functions
+
+
 async def getStaff(indexer, value):
     s = text('SELECT * FROM staff WHERE :i = :v')
     await openDB()
@@ -151,43 +166,66 @@ async def getStaff(indexer, value):
     await closeDB()
     return staff
 
-async def addStaff(name, id, role): # TODO: Send message to user 
-    i = text('INSERT INTO staff (first_last, discord_id, role) VALUES (:name, :id, :role)')
+
+async def addStaff(name, id, role):  # TODO: Send message to user
+    i = text(
+        'INSERT INTO staff (first_last, discord_id, role) VALUES (:name, :id, :role)')
     await openDB()
     sq.execute(i, name=name, id=id, role=role)
     await closeDB()
 
-async def removeStaff(indexer, value): # TODO: Send message to user 
+
+async def removeStaff(indexer, value):  # TODO: Send message to user
     d = text('DELETE FROM staff WHERE :i = :v')
     await openDB()
     sq.execute(d, i=indexer, v=value)
     await closeDB()
-#endregion
+# endregion
 
-#region Verification Functions
-async def addReport(message):
-    id = message.content.split(' ')[1]
+# region Verification Functions
+
+
+async def addReport(message, id=None):
+    if id == None:
+        id = message.content.split(' ')[1]
     msg = message.channel.fetch_message(id)
 
-    i = text('INSERT IGNORE INTO verification (message_id, channel_id) VALUES (:msg, :cha)')
+    i = text(
+        'INSERT IGNORE INTO verification (message_id, channel_id) VALUES (:msg, :cha)')
     await openDB()
     sq.execute(i, msg=msg.id, cha=msg.channel.id)
     await closeDB()
     await sendVerificationUpdate(msg)
 
-#endregion
+
+async def getReport(message, id):
+    msg = message.channel.fetch_message(id)
+
+    s = text('SELECT * FROM verification WHERE message_id = :id')
+    await openDB()
+    report = sq.execute(s, id=msg.id)
+    await closeDB()
+    return report
 
 
+async def verify(indexer, value, id):
+    u = text('UPDATE verification SET :i = :v WHERE message_id = :id')
+    await openDB()
+    sq.execute(u, i=indexer, v=value, id=id)
+    await closeDB()
+# endregion
 
 
-async def sendVerificationUpdate(message): #Send verification embed to 682637318569721898 
-    embed = discord.Embed(title='Please Verify:', description='Case **#%s**' % message.id, color=0xf04923)
+# Send verification embed to 682637318569721898
+async def sendVerificationUpdate(message):
+    embed = discord.Embed(title='Please Verify:',
+                          description='Case **#%s**' % message.id, color=0xf04923)
     if len(message.attachments) > 1:
         def check(author):
             def inner_check(message):
                 return message.author == author and 0 < int(message.content) <= len(message.attachments)
             return inner_check
-        
+
         await message.channel.send('Which attachment? (Decending 1-%i)' % len(message.attachments), delete_after=30)
         try:
             result = await client.wait_for('message', check=check(message.author), timeout=30)
@@ -196,18 +234,18 @@ async def sendVerificationUpdate(message): #Send verification embed to 682637318
         else:
             sight = await Sight(message, message.attachments[result - 1].proxy_url)
             embed.set_image(url=message.attachments[result - 1].proxy_url)
-            embed.add_field(name='Offenses:', value=', '.join(sight), inline=True)
+            embed.add_field(name='Offenses:',
+                            value=', '.join(sight), inline=True)
     else:
         sight = await Sight(message, message.attachments[0].proxy_url)
         embed.set_image(url=message.attachments[0].proxy_url)
-        embed.add_field(name='Cause:', value='[Link](%s)' % message.attachments[0].proxy_url, inline=True)
+        embed.add_field(
+            name='Cause:', value='[Link](%s)' % message.attachments[0].proxy_url, inline=True)
         embed.add_field(name='Offenses:', value=', '.join(sight), inline=True)
 
     embed.set_footer(text='✅ to Confirm  |  ❌ to Deny')
 
     await client.get_channel(682637318569721898).send(embed=embed)
-
-
 
 
 # Grab bot token and prefix, sightengine, and tosc file location from json, TODO: If we have any actual user commands, make the prefix changable
@@ -220,8 +258,6 @@ with open('info.json', 'r') as json_file:
         SESecret = j['SESecret']
         ocrLocation = j['tesseractLocation']
     json_file.close()
-
-
 
 
 client = commands.Bot(command_prefix=prefix)
@@ -277,17 +313,19 @@ async def on_message(message):
     elif message.content.startswith(prefix):
         if 'test' in message.content:
             url = 'https://cdn.discordapp.com/attachments/620167820558204928/675434297775357962/n4VQ3hbwOkofbjhdiqEj_PWILJQ9ssqsCDRuOguC-AufrmYgdaamPE8kxotb52EzoT3ZkkItcvfMIaWzZlpT_yqof2OBocKMu6Dk.png'
-            embed = discord.Embed(title='Please Verify:', description='Case **#683034905051004999**', color=0xf04923)
+            embed = discord.Embed(
+                title='Please Verify:', description='Case **#683034905051004999**', color=0xf04923)
             embed.set_image(url=url)
             embed.set_footer(text='✅ to Confirm  |  ❌ to Deny')
-            embed.add_field(name='Cause:', value='[Link](%s)' % url, inline=True)
+            embed.add_field(
+                name='Cause:', value='[Link](%s)' % url, inline=True)
             x = ['Gun', 'Racist']
             embed.add_field(name='Offenses:', value=', '.join(x), inline=True)
 
             await message.channel.send(embed=embed)
 
-            #await sentMessage.add_reaction(emoji='✅')
-            #await sentMessage.add_reaction(emoji='❌')
+            # await sentMessage.add_reaction(emoji='✅')
+            # await sentMessage.add_reaction(emoji='❌')
 
             def check(reaction, user):
                 return user == message.author and str(reaction.emoji) == '✅' or '❌'
@@ -305,37 +343,65 @@ async def on_message(message):
             await addReport(message)
 
         elif 'verify ' in message.content:
-            caseNum = message.content.replace('#', '').split(' ')[1]
-            if caseNum != None:
-                NotImplemented #search for # in verification database
-                if found:  
-                    NotImplemented #add thier name to confirmed/denied list
-                else:
-                    await message.channel.send(content='Case #%s not found!' % caseNum)
+            if message.author in getStaff('role', 'admin'):
+                caseNum = message.content.replace('#', '').split(' ')[1]
+                if caseNum != None:
+                    report = getReport(message, caseNum)
+                    if report != None:
+                        await message.add_reaction(emoji='✅')
+                        await message.add_reaction(emoji='❌')
 
-            else:
-                await message.channel.send(content='Case number cannot be blank!')
-            
+                        def check(reaction, user):
+                            return user == message.author and str(reaction.emoji) == '✅' or '❌'
+
+                        try:
+                            reaction, user = await client.wait_for('reaction_add', timeout=30, check=check)
+                        except:
+                            await message.channel.send('Error')
+                        else:
+                            # TODO: change (user == message.author) to check against list of admins/mods/whatever and send to admin chat in server
+                            if (user == message.author) and (reaction == '✅' or '❌'):
+                                if reaction == '✅':
+                                    verify('confirmed_by',
+                                           message.author, caseNum)
+                                elif reaction == '❌':
+                                    verify('denied_by', message.author, caseNum)
+                    else:
+                        await message.channel.send(content='Case #%s not found!' % caseNum)
+
+                else:
+                    await message.channel.send(content='Case number cannot be blank! Check `CHANNEL_NAME` for more info.')
+
         elif 'admin' in message.content:
-            #await addStaff('Caden Garrett', '147926148616159233', 'master')
+            # await addStaff('Caden Garrett', '147926148616159233', 'master')
             NotImplemented
 
+    attachments = []
+    for url in await URL(text):
+        attachments.append(url)
+    for attach in message.attachments:
+        attachments.append(attach.proxy_url)
+
+    prob = predictText(message.content)
+    if prob > 0.5: #change this value?
+        Warn(message.content, '%i%% offensive' % prob, message.author)
+
+    for attach in attachments:
+        Sight(message, attach)
 
 
+async def predictText(text):
+    prob = predict_prob(text)
+    return prob
 
-    else: #probably shouldn't be an else
-        for url in await URL(message.content):
-            print('URL: ', url)
-        return
 
-        responce = requests.get(a.proxy_url)
-        img = Image.open(BytesIO(responce.content))
-        text = pytesseract.image_to_string(Image.open(
-            BytesIO(requests.get(a.proxy_url).content)))  # ughhhhh
-        prob = predict_prob([text])
+async def predictImage(url):
+    txt = pytesseract.image_to_string(Image.open(
+        BytesIO(requests.get(url).content)))  # ughhhhh
+    img_prob = predict_prob([txt])
 
-        for i in message.attachments:  # TODO: Doesn't detect image if sent by url
-            Sight(message, i.proxy_url)
+    return img_prob
+
 
 # TODO: Train these variables? Make them modifyable in json?
 async def Sight(message, url):
@@ -362,27 +428,19 @@ async def Sight(message, url):
         if output['offensive']['prob'] > 0.5:
             offenses.append('OFFENSIVE')
 
-        if len(offenses) > 0:
-            await message.delete()
-            await Warn(offenses, message.author, url)
-
         with open('test.json', 'w') as outfile:
             json.dump(output, outfile, indent=4)
         outfile.close()
 
-        return(0)
-    else:
-        return(1)
+        return offenses
+    else:  # error, send to be manually reviewed
+        addReport(message, message.id)
 
 
-async def Warn(offences, author, img_url):
+async def Warn(cause, offences, author):
     # add to user's warnings, if > 3 then ban
-    await openDB()
-    sq.execute('SELECT warnings FROM warned WHERE user_id=?',
-               (author.id,))
-    temp = sq.fetchone()
-    warnings = temp[0] + 1
-    banned = False
+    giveWarning('discord_id', author, cause, offences)
+    warnings = warningCount('discord_id', author)
 
     embed = discord.Embed(title='WARNING', type='rich', color=0xf04923)
     embed.set_author(name='Sprague Bot', url='https://github.com/Th4tGuy69/Sprague-Bot',
@@ -400,16 +458,12 @@ async def Warn(offences, author, img_url):
         banned = True  # TODO: Ban them fools
         embed.add_field(name=text, value=':x::x::x:')
 
-    embed.set_image(url=img_url)
+    if URL(cause) != None:
+        embed.set_image(url=URL(cause))
     embed.set_footer(text='Remember to make it a great day!')
 
     # TODO: Send to an admin chat to confirm warnings
     await author.send(embed=embed)
-
-    sq.execute('UPDATE warned SET warnings = ?, banned = ? WHERE user_id=?',
-               (warnings, banned, author.id,))
-
-    await closeDB()
 
 
 # Web crawler grabs announcements, modifys, then posts to id=619772443116175370
