@@ -1,9 +1,12 @@
+# region Header
 # ---
 # TODO: Censorship warning system, download image to check for adult content, read text, and keep track of who has recieved warnings and why
 # TODO: Connect to a student database to auto-assign roles and nick-names? Same system that does schedule changes with
 #      student ID, first letter of last name, email, etc. (Doubt we would get access... unless..?)
 # TODO: Try to make this ass professional as possible :) - IN PROGRESS
 # ---
+# endregion
+
 
 # region Imports
 import re
@@ -31,6 +34,8 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 # endregion
 
 
+# region Miscellaneous Functions/Other
+
 emojiA = 'https://i.imgur.com/dmTKeTi.png'
 emojiB = 'https://i.imgur.com/oLJnbDL.png'
 emojiAB = 'https://i.imgur.com/dVOtgZq.png'
@@ -41,8 +46,9 @@ announcements = []
 date = ''
 dayType = ''
 
-
 # URL Validation
+
+
 async def URL(str):
     url = re.findall(
         r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\), ]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', str)
@@ -54,6 +60,139 @@ class Warning():
         self.cause, self.offences = c, o
 
 
+async def predictText(text):
+    prob = predict_prob(text)
+    return prob
+
+
+async def predictImage(url):
+    txt = pytesseract.image_to_string(Image.open(
+        BytesIO(requests.get(url).content)))  # ughhhhh
+    img_prob = predict_prob([txt])
+
+    return img_prob
+
+
+# TODO: Train these variables? Make them modifyable in json?
+async def Sight(message, url):
+    output = sight.check(
+        'nudity', 'wad', 'offensive').set_url(url)
+    if output['status'] == 'success':
+        offenses = []
+
+        # check nudity
+        if output['nudity']['raw'] > 0.35:
+            offenses.append('RAW NUDITY')
+        if output['nudity']['partial'] > 0.35:
+            offenses.append('PARTIAL NUDITY')
+
+        # check weapons, alcohol, & drugs
+        if output['weapon'] > 0.4:
+            offenses.append('WEAPON')
+        if output['alcohol'] > 0.5:
+            offenses.append('ALCOHOL')
+        if output['drugs'] > 0.5:
+            offenses.append('DRUGS')
+
+        # check offensive
+        if output['offensive']['prob'] > 0.5:
+            offenses.append('OFFENSIVE')
+
+        with open('test.json', 'w') as outfile:
+            json.dump(output, outfile, indent=4)
+        outfile.close()
+
+        return offenses
+    else:  # error, send to be manually reviewed
+        addReport(message, message.id)
+
+
+async def Warn(cause, offences, author):
+    # add to user's warnings, if > 3 then ban
+    giveWarning('discord_id', author, cause, offences)
+    warnings = warningCount('discord_id', author)
+
+    embed = discord.Embed(title='WARNING', type='rich', color=0xf04923)
+    embed.set_author(name='Sprague Bot', url='https://github.com/Th4tGuy69/Sprague-Bot',
+                     icon_url=emojiExclamation)
+
+    text = 'YOU POSTED AN IMAGE CONTAINING: `{}`'.format(', '.join(offences))
+
+    if warnings == 1:
+        embed.add_field(
+            name=text, value=':x::heavy_multiplication_x::heavy_multiplication_x:')
+    elif warnings == 2:
+        embed.add_field(
+            name=text, value=':x::x::heavy_multiplication_x:')
+    elif warnings >= 3:
+        banned = True  # TODO: Ban them fools
+        embed.add_field(name=text, value=':x::x::x:')
+
+    if URL(cause) != None:
+        embed.set_image(url=URL(cause))
+    embed.set_footer(text='Remember to make it a great day!')
+
+    # TODO: Send to an admin chat to confirm warnings
+    await author.send(embed=embed)
+
+
+# Web crawler grabs announcements, modifies, then posts to id=619772443116175370
+async def postAnnouncements():
+    announcements.clear()
+
+    today = dt.date.today()
+    date = str(today).split('-')
+
+    if dt.date.today().weekday() is 1 or 3:
+        dayType = 'an **A** day'
+    elif dt.date.today().weekday() is 2 or 4:
+        dayType = 'a **B** day'
+    elif dt.date.today().weekday() is 0:
+        dayType = 'an **A/B** day'
+
+    # Web crawler
+    page = requests.get('http://spragueannouncements.blogspot.com/')
+
+    soup = BeautifulSoup(page.content, 'lxml')
+    whole = soup.find(class_='post-body entry-content')
+    class_ = whole.find_all('div')
+    class_.pop(0)
+    for div in class_:
+        if len(div.text) > 3:
+            text = div.text
+            if '/' in text:
+                text = text[:-4]
+            text = re.sub(r'\s+', ' ', text)
+
+            announcements.append(text)
+
+    # Embed setup
+    embed = discord.Embed(title='Announcements for **{}/{}/{}**, {}.'.format(date[1].replace(
+        '0', ''), date[2], date[0][2:], dayType), type='rich', url='http://spragueannouncements.blogspot.com/', color=0xf04923)
+    embed.set_author(name='Sprague Bot', url='https://github.com/Th4tGuy69/Sprague-Bot',
+                     icon_url=emojiAnnouncements)
+    time = dt.date(day=today.day, month=today.month,
+                   year=today.year).strftime('%A %B %d, %Y')
+    embed.set_footer(text='Keep on a\'rocking Sprague! | ' + time)
+    if dt.date.today().weekday() is 1 or 3:
+        embed.set_thumbnail(url=emojiA)
+    elif dt.date.today().weekday() is 2 or 4:
+        embed.set_thumbnail(url=emojiB)
+    elif dt.date.today().weekday() is 0:
+        embed.set_thumbnail(url=emojiAB)
+    for announcement in announcements:
+        if len(announcement) > 1024:
+            announcement = announcement[:1021] + '...'
+
+        embed.add_field(name='⸻\t\t\t⸻\t\t\t⸻\t\t\t⸻\t\t\t⸻',
+                        value=announcement)
+
+    await client.get_channel(619772443116175370).send(embed=embed)
+
+# endregion
+
+
+# region Database Initialization
 # TODO: Include student id, grade, more?
 # https://www.compose.com/articles/using-postgresql-through-sqlalchemy/
 # https://stackoverflow.com/questions/9521020/sqlalchemy-array-of-postgresql-custom-types
@@ -73,7 +212,7 @@ warned = Table('warned', metadata,
                Column('discord_id', sqlalchemy.types.String),
                Column('banned', sqlalchemy.types.Boolean),
                Column('warnings', sqlalchemy.types.ARRAY(CompositeType(
-                   'warning',  # Include if manually overrided?
+                   'warning',  # Include if manually overridden?
                    [
                        Column('cause', sqlalchemy.types.String),
                        Column('offenses', sqlalchemy.types.ARRAY(
@@ -98,6 +237,10 @@ verification = Table('verification', metadata,
                      Column('denied_by', sqlalchemy.types.String)
                      )
 # metadata.create_all(engine)
+# endregion
+
+
+# region Database Functions
 
 
 async def openDB():
@@ -213,10 +356,8 @@ async def verify(indexer, value, id):
     await openDB()
     sq.execute(u, i=indexer, v=value, id=id)
     await closeDB()
-# endregion
 
 
-# Send verification embed to 682637318569721898
 async def sendVerificationUpdate(message):
     embed = discord.Embed(title='Please Verify:',
                           description='Case **#%s**' % message.id, color=0xf04923)
@@ -246,9 +387,13 @@ async def sendVerificationUpdate(message):
     embed.set_footer(text='✅ to Confirm  |  ❌ to Deny')
 
     await client.get_channel(682637318569721898).send(embed=embed)
+# endregion
+# endregion
 
 
-# Grab bot token and prefix, sightengine, and tosc file location from json, TODO: If we have any actual user commands, make the prefix changable
+# region Initialization
+
+# Grab bot token and prefix, sightengine, and tosc file location from json, TODO: Make the prefix changable
 with open('info.json', 'r') as json_file:
     data = json.load(json_file)
     for j in data['info']:
@@ -259,7 +404,7 @@ with open('info.json', 'r') as json_file:
         ocrLocation = j['tesseractLocation']
     json_file.close()
 
-
+# client initialization
 client = commands.Bot(command_prefix=prefix)
 sight = SightengineClient(SEUser, SESecret)
 pytesseract.pytesseract.tesseract_cmd = ocrLocation
@@ -267,7 +412,10 @@ pytesseract.pytesseract.tesseract_cmd = ocrLocation
 # https://digi.bib.uni-mannheim.de/tesseract/tesseract-ocr-w64-setup-v5.0.0-alpha.20190708.exe
 # https://stackoverflow.com/questions/50951955/pytesseract-tesseractnotfound-error-tesseract-is-not-installed-or-its-not-i
 
+# endregion
 
+
+# region Bot Events
 @client.event
 async def on_ready():
     print('\nLogged in as:', client.user.name)
@@ -383,143 +531,15 @@ async def on_message(message):
         attachments.append(attach.proxy_url)
 
     prob = predictText(message.content)
-    if prob > 0.5: #change this value?
+    if prob > 0.5:  # change this value?
         Warn(message.content, '%i%% offensive' % prob, message.author)
 
     for attach in attachments:
         Sight(message, attach)
+# endregion
 
 
-async def predictText(text):
-    prob = predict_prob(text)
-    return prob
-
-
-async def predictImage(url):
-    txt = pytesseract.image_to_string(Image.open(
-        BytesIO(requests.get(url).content)))  # ughhhhh
-    img_prob = predict_prob([txt])
-
-    return img_prob
-
-
-# TODO: Train these variables? Make them modifyable in json?
-async def Sight(message, url):
-    output = sight.check(
-        'nudity', 'wad', 'offensive').set_url(url)
-    if output['status'] == 'success':
-        offenses = []
-
-        # check nudity
-        if output['nudity']['raw'] > 0.35:
-            offenses.append('RAW NUDITY')
-        if output['nudity']['partial'] > 0.35:
-            offenses.append('PARTIAL NUDITY')
-
-        # check weapons, alcohol, & drugs
-        if output['weapon'] > 0.4:
-            offenses.append('WEAPON')
-        if output['alcohol'] > 0.5:
-            offenses.append('ALCOHOL')
-        if output['drugs'] > 0.5:
-            offenses.append('DRUGS')
-
-        # check offensive
-        if output['offensive']['prob'] > 0.5:
-            offenses.append('OFFENSIVE')
-
-        with open('test.json', 'w') as outfile:
-            json.dump(output, outfile, indent=4)
-        outfile.close()
-
-        return offenses
-    else:  # error, send to be manually reviewed
-        addReport(message, message.id)
-
-
-async def Warn(cause, offences, author):
-    # add to user's warnings, if > 3 then ban
-    giveWarning('discord_id', author, cause, offences)
-    warnings = warningCount('discord_id', author)
-
-    embed = discord.Embed(title='WARNING', type='rich', color=0xf04923)
-    embed.set_author(name='Sprague Bot', url='https://github.com/Th4tGuy69/Sprague-Bot',
-                     icon_url=emojiExclamation)
-
-    text = 'YOU POSTED AN IMAGE CONTAINING: `{}`'.format(', '.join(offences))
-
-    if warnings == 1:
-        embed.add_field(
-            name=text, value=':x::heavy_multiplication_x::heavy_multiplication_x:')
-    elif warnings == 2:
-        embed.add_field(
-            name=text, value=':x::x::heavy_multiplication_x:')
-    elif warnings >= 3:
-        banned = True  # TODO: Ban them fools
-        embed.add_field(name=text, value=':x::x::x:')
-
-    if URL(cause) != None:
-        embed.set_image(url=URL(cause))
-    embed.set_footer(text='Remember to make it a great day!')
-
-    # TODO: Send to an admin chat to confirm warnings
-    await author.send(embed=embed)
-
-
-# Web crawler grabs announcements, modifys, then posts to id=619772443116175370
-async def postAnnouncements():
-    announcements.clear()
-
-    today = dt.date.today()
-    date = str(today).split('-')
-
-    if dt.date.today().weekday() is 1 or 3:
-        dayType = 'an **A** day'
-    elif dt.date.today().weekday() is 2 or 4:
-        dayType = 'a **B** day'
-    elif dt.date.today().weekday() is 0:
-        dayType = 'an **A/B** day'
-
-    # Web crawler
-    page = requests.get('http://spragueannouncements.blogspot.com/')
-
-    soup = BeautifulSoup(page.content, 'lxml')
-    whole = soup.find(class_='post-body entry-content')
-    class_ = whole.find_all('div')
-    class_.pop(0)
-    for div in class_:
-        if len(div.text) > 3:
-            text = div.text
-            if '/' in text:
-                text = text[:-4]
-            text = re.sub(r'\s+', ' ', text)
-
-            announcements.append(text)
-
-    # Embed setup
-    embed = discord.Embed(title='Announcements for **{}/{}/{}**, {}.'.format(date[1].replace(
-        '0', ''), date[2], date[0][2:], dayType), type='rich', url='http://spragueannouncements.blogspot.com/', color=0xf04923)
-    embed.set_author(name='Sprague Bot', url='https://github.com/Th4tGuy69/Sprague-Bot',
-                     icon_url=emojiAnnouncements)
-    time = dt.date(day=today.day, month=today.month,
-                   year=today.year).strftime('%A %B %d, %Y')
-    embed.set_footer(text='Keep on a\'rocking Sprague! | ' + time)
-    if dt.date.today().weekday() is 1 or 3:
-        embed.set_thumbnail(url=emojiA)
-    elif dt.date.today().weekday() is 2 or 4:
-        embed.set_thumbnail(url=emojiB)
-    elif dt.date.today().weekday() is 0:
-        embed.set_thumbnail(url=emojiAB)
-    for announcement in announcements:
-        if len(announcement) > 1024:
-            announcement = announcement[:1021] + '...'
-
-        embed.add_field(name='⸻\t\t\t⸻\t\t\t⸻\t\t\t⸻\t\t\t⸻',
-                        value=announcement)
-
-    await client.get_channel(619772443116175370).send(embed=embed)
-
-
+# region Startup
 # Scheduled posting of announcements
 scheduler = AsyncIOScheduler()
 scheduler.add_job(postAnnouncements, trigger='cron',
@@ -528,3 +548,4 @@ scheduler.start()
 
 
 client.run(token)
+# endregion
