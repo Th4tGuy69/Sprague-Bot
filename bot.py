@@ -205,7 +205,7 @@ sqlalchemy_utils.functions.drop_database(engine.url)
 sqlalchemy_utils.functions.create_database(engine.url)
 
 metadata = MetaData(engine)
-warned = Table('warned', metadata,
+members = Table('members', metadata,
                Column('first_last', sqlalchemy.types.String, primary_key=True),
                #Column('student_id', sqlalchemy.types.SmallInteger, primary_key=True),
                #Column('grade', sqlalchemy.types.SmallInteger),
@@ -225,7 +225,7 @@ staff = Table('staff', metadata,
               #Column('student_id', sqlalchemy.types.SmallInteger, primary_key=True),
               #Column('grade', sqlalchemy.types.SmallInteger),
               Column('discord_id', sqlalchemy.types.String),
-              Column('role', sqlalchemy.types.String)
+              Column('roles', sqlalchemy.types.ARRAY(sqlalchemy.types.String))
               )
 verification = Table('verification', metadata,
                      Column('message_id', sqlalchemy.types.String,
@@ -233,6 +233,7 @@ verification = Table('verification', metadata,
                      Column('channel_id', sqlalchemy.types.String),
                      #Column('student_id', sqlalchemy.types.SmallInteger, primary_key=True),
                      #Column('grade', sqlalchemy.types.SmallInteger),
+                     Column('reported_by', sqlalchemy.types.ARRAY(sqlalchemy.types.String)),
                      Column('confirmed_by', sqlalchemy.types.String),
                      Column('denied_by', sqlalchemy.types.String)
                      )
@@ -241,7 +242,7 @@ verification = Table('verification', metadata,
 
 
 # region Database Functions
-
+# TODO: support for searaching for ids?
 
 async def openDB():
     global sq
@@ -252,13 +253,28 @@ async def closeDB():
     sq.execute('commit')
     sq.close()
 
-# TODO: support for searaching for ids?
+
+#region Member Functions
+
+async def AddMember(name, id):
+    i = text('INSERT IGNROE INTO members (first_last, discord_id) VALUES (:name, :id)')
+    await openDB()
+    sq.execute(i, name=name, id=id)
+    await closeDB()
+
+async def RemoveMember(indexer, value):
+    d = text('DELETE FROM members WHERE :i = :v')
+    await openDB()
+    sq.execute(d, i=indexer, v=value)
+    await closeDB()
+
+#endregion
 
 # region Warning Functions
 
 
 async def getWarnings(indexer, value):
-    s = text('SELECT warnings[:i] FROM warned WHERE :ind = :v')
+    s = text('SELECT warnings[:i] FROM members WHERE :ind = :v')
     warnings = []
     await openDB()
     for x in range(3):
@@ -276,7 +292,7 @@ async def getWarnings(indexer, value):
 
 
 async def warningCount(indexer, value):
-    s = text('SELECT warned, ARRAY_LENGTH(warnings) WHERE :i = :v')
+    s = text('SELECT members, ARRAY_LENGTH(warnings) WHERE :i = :v')
     await openDB()
     count = sq.execute(s, i=indexer, v=value)
     await closeDB()
@@ -285,7 +301,7 @@ async def warningCount(indexer, value):
 
 async def giveWarning(indexer, value, cause, offences):  # TODO: Send message to user
     u = text(
-        'UPDATE warned SET warnings = array_append(warnings, (:c, :o)::warning) WHERE :i = :v')
+        'UPDATE members SET warnings = array_append(warnings, (:c, :o)::warning) WHERE :i = :v')
     await openDB()
     sq.execute(u, c=cause, o=offences, i=indexer, v=value)
     await closeDB()
@@ -293,7 +309,7 @@ async def giveWarning(indexer, value, cause, offences):  # TODO: Send message to
 
 async def removeWarning(indexer, value, cause, offences):  # TODO: Send message to user
     u = text(
-        'UPDATE warned SET warnings = array_remove(warnings, (:c, :o)::warning) WHERE :i = :v')
+        'UPDATE members SET warnings = array_remove(warnings, (:c, :o)::warning) WHERE :i = :v')
     await openDB()
     sq.execute(u, c=cause, o=offences, i=indexer, v=value)
     await closeDB()
@@ -310,11 +326,11 @@ async def getStaff(indexer, value):
     return staff
 
 
-async def addStaff(name, id, role):  # TODO: Send message to user
+async def addStaff(name, id, roles):  # TODO: Send message to user
     i = text(
-        'INSERT INTO staff (first_last, discord_id, role) VALUES (:name, :id, :role)')
+        'INSERT INTO staff (first_last, discord_id, roles) VALUES (:name, :id, (:roles))')
     await openDB()
-    sq.execute(i, name=name, id=id, role=role)
+    sq.execute(i, name=name, id=id, roles=roles)
     await closeDB()
 
 
@@ -333,12 +349,20 @@ async def addReport(message, id=None):
         id = message.content.split(' ')[1]
     msg = message.channel.fetch_message(id)
 
-    i = text(
-        'INSERT IGNORE INTO verification (message_id, channel_id) VALUES (:msg, :cha)')
-    await openDB()
-    sq.execute(i, msg=msg.id, cha=msg.channel.id)
-    await closeDB()
-    await sendVerificationUpdate(msg)
+    report = getReport(message, id)
+    if report == None:
+        i = text(
+            'INSERT IGNORE INTO verification (message_id, channel_id) VALUES (:msg, :cha)')
+        await openDB()
+        sq.execute(i, msg=msg.id, cha=msg.channel.id)
+        await closeDB()
+        await sendVerificationEmbed(msg)
+    else:
+        u = text('UPDATE verification SET reported_by = ARRAY_APPEND(reported_by, :reporter) WHERE message_id = :id')
+        await openDB()
+        sq.execute(u, reporter=message.author.id, id=msg.id)
+        await closeDB()
+        await sendVerificationEmbed(msg)
 
 
 async def getReport(message, id):
@@ -358,7 +382,7 @@ async def verify(indexer, value, id):
     await closeDB()
 
 
-async def sendVerificationUpdate(message):
+async def sendVerificationEmbed(message):
     embed = discord.Embed(title='Please Verify:',
                           description='Case **#%s**' % message.id, color=0xf04923)
     if len(message.attachments) > 1:
@@ -384,7 +408,7 @@ async def sendVerificationUpdate(message):
             name='Cause:', value='[Link](%s)' % message.attachments[0].proxy_url, inline=True)
         embed.add_field(name='Offenses:', value=', '.join(sight), inline=True)
 
-    embed.set_footer(text='✅ to Confirm  |  ❌ to Deny')
+    embed.set_footer(text='Use %sverify  |  ✅ to Confirm  |  ❌ to Deny' % prefix)
 
     await client.get_channel(682637318569721898).send(embed=embed)
 # endregion
@@ -429,13 +453,13 @@ async def on_ready():
 # Sends new users a message on joining the guild
 # TODO: Test
 # TODO: Check username for profanity
-# TODO: Check pfp with sight engine and require change
+# TODO: Check avatar with sight engine and require change
 # TODO: Add new users to Database
 @client.event
 async def on_member_join(member):
-    '''
-    temp = predict([member.name])
-    print(temp[0])
+    nameProb = predictText(member.name)
+    avatarProb = predictImage(member.avatar_url)
+    print(nameProb, avatarProb)
 
     embed = discord.Embed(title='Hello `{}`!'.format(
         member.name), type='rich', color=0xf04923)
@@ -447,11 +471,6 @@ async def on_member_join(member):
 
     await member.send(embed=embed)
 
-    await openDB()
-    sq.execute('INSERT INTO warned VALUES (?,?,?,?)',
-               (name, member.id, 0, False,))
-    await closeDB()
-    '''
 
 
 @client.event
@@ -491,7 +510,7 @@ async def on_message(message):
             await addReport(message)
 
         elif 'verify ' in message.content:
-            if message.author in getStaff('role', 'admin'):
+            if message.author in getStaff('role', 'mod'):
                 caseNum = message.content.replace('#', '').split(' ')[1]
                 if caseNum != None:
                     report = getReport(message, caseNum)
